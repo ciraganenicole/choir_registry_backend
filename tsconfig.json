@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "target": "ESNext",
+    "module": "CommonJS",
+    "strictPropertyInitialization": false,
+    "esModuleInterop": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  }
+}

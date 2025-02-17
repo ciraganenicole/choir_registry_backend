@@ -1,0 +1,30 @@
+version: '3.9'
+services:
+  nestapp:
+    container_name: nestapp
+    image: francescoxx/nestapp:1.0.0
+    build: .
+    ports:
+      - '4000:4000'
+    environment:
+      - DB_TYPE=postgres
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=2022
+      - DB_NAME=choir_registry
+      - DB_PORT=5432
+      - DB_HOST=db
+    depends_on:
+      - db
+  db:
+    container_name: db
+    image: postgres:12
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 2022
+      POSTGRES_DB: choir_registry
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata: {}
