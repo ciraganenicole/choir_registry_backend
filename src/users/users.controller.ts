@@ -25,10 +25,10 @@ export class UsersController {
  
    //create user
    @Post()
-   async create(@Body() user: User): Promise<User> {
-    console.log(user);
-     return this.usersService.createUser(user);
-   }
+async create(@Body() userData: any): Promise<User> {
+  console.log(userData); // Check the structure of userData here
+  return this.usersService.createUser(userData);
+}
  
    //update user
    @Put(':id')

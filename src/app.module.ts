@@ -6,11 +6,15 @@ import { UsersModule } from './users/users.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { WebAuthnModule } from './webauthn/webauthn.module';
+import { AttendanceModule } from './attendance/attendance.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     UsersModule,
+    WebAuthnModule,
+    AttendanceModule,
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST || 'localhost',  // Default to 'db'

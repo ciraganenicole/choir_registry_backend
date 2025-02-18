@@ -20,7 +20,7 @@ async function bootstrap() {
 
   // Enable global authentication guard
   const reflector = app.get(Reflector);
-  app.useGlobalGuards(new JwtAuthGuard(reflector));
+  // app.useGlobalGuards(new JwtAuthGuard(reflector));
 
   await app.listen(4000);
 }

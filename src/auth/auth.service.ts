@@ -27,41 +27,60 @@ export class AuthService {
     }
 
     async login(email: string, password: string) {
-        const user = await this.validateUser(email, password);
+        console.log(`Attempting login for email: ${email}`);
+    
+        const user = await this.adminUsersService.findOneByEmail(email);
+        if (!user) {
+            console.log("User not found.");
+            throw new UnauthorizedException("Invalid email");
+        }
+    
+        console.log(`User found: ${user.email}`);
+    
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            console.log("Password incorrect.");
+            throw new UnauthorizedException("Invalid password");
+        }
+    
+        console.log("Login successful.");
         const payload = { email: user.email, sub: user.id };
-        return { access_token: this.jwtService.sign(payload) };
+        return { access_token: this.jwtService.sign(payload), user };
     }
+    
 
     async createHardcodedAdmin() {
-        const email = "useradmin@example.com";
-        const password = "password123";
-
-        // Check if the user already exists
+        const email = "admin@example.com";
+        const password = "password123"; // Hardcoded password
+    
         const existingUser = await this.adminUsersService.findOneByEmail(email);
         if (existingUser) {
             this.logger.warn("Hardcoded admin user already exists.");
+            console.log("Admin user already exists:", existingUser);
             return { message: "Admin user already exists", user: existingUser };
         }
-
-        // Hash the password
-        const saltRounds = 10;
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-        // Create and save the user
+    
         try {
-            const newUser = await this.adminUsersService.create({
-                email,
-                password: hashedPassword,
-            });
-
-            this.logger.log("Hardcoded admin user created successfully.");
+            // Hash the password using bcrypt
+            const hashedPassword = await bcrypt.hash(password, 10);
+    
+            const hardcodedUser = { email, password: hashedPassword };
+    
+            console.log("Inserting hardcoded user:", hardcodedUser);
+    
+            // Now insert the user with the hashed password
+            await this.adminUsersService.createAdminUser(hardcodedUser);
+    
+            this.logger.log("Hardcoded admin user inserted successfully.");
             return {
-                message: "Admin user created successfully",
-                user: { id: newUser.id, email: newUser.email },
+                message: "Admin user inserted successfully",
+                user: { email: hardcodedUser.email },
             };
         } catch (error) {
-            this.logger.error("Error creating hardcoded admin user", error);
-            throw new ConflictException("Error creating admin user");
+            this.logger.error("Error inserting hardcoded admin user", error);
+            throw new ConflictException("Error inserting admin user");
         }
     }
+    
+    
 }

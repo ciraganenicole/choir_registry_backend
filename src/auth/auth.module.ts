@@ -7,6 +7,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminUser } from '../admin/admin_users.entity';
 import { ConfigModule } from '@nestjs/config';  // <-- Add this import
+import { AuthController } from './auth.controller';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ConfigModule } from '@nestjs/config';  // <-- Add this import
     }),
     ConfigModule.forRoot(),  // <-- Add this line to import ConfigModule
   ],
+  controllers: [AuthController],
   providers: [AuthService, AdminUsersService, JwtStrategy],
   exports: [AuthService],
 })

@@ -10,7 +10,7 @@ export class AdminUsersService {
         private adminUserRepository: Repository<AdminUser>
     ) {}
 
-    async create(userData: Partial<AdminUser>): Promise<AdminUser> {
+    async createAdminUser(userData: Partial<AdminUser>): Promise<AdminUser> {
         const newUser = this.adminUserRepository.create(userData);
         return this.adminUserRepository.save(newUser);
     }
