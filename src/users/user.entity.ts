@@ -28,6 +28,9 @@ publicKey?: string | null;
   @Column({ type: 'bigint', default: 0 })  // Add this column
   counter: number;
 
+  @Column({ type: 'text', nullable: true }) // Add this column
+  credentialID: string;
+
 @OneToMany(() => Attendance, (attendance) => attendance.user)
   attendance: Attendance[];
 
