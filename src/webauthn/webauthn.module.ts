@@ -12,6 +12,6 @@ import { AttendanceModule } from '../attendance/attendance.module';
   ],
   controllers: [WebAuthnController],
   providers: [WebAuthnService],
-  exports: [WebAuthnService],
+  // exports: [WebAuthnService],
 })
 export class WebAuthnModule {}

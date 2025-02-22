@@ -1,9 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
-
-let userIdCounter = 1; 
 
 @Injectable()
 export class UsersService {
@@ -13,66 +11,80 @@ export class UsersService {
   ) {}
 
   async getOneUser(id: number): Promise<User> {
-    return this.userRepository.findOne({ where: { id } });
+    const user = await this.userRepository.findOne({ 
+      where: { id }, 
+      relations: ['leaves', 'attendance'] 
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    return user;
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await this.userRepository.find();
+    return this.userRepository.find({ relations: ['leaves', 'attendance'] });
   }
 
-  async createUser(userData: any) {
-    // Ensure required fields are provided
+  async createUser(userData: any): Promise<User> {
     if (!userData.name || !userData.surname || !userData.phoneNumber) {
       throw new BadRequestException('Required fields missing');
     }
-  
-    // Create new user object, including default values
+
     const newUser = this.userRepository.create({
       name: userData.name,
       surname: userData.surname,
       phoneNumber: userData.phoneNumber,
       matricule: `NJC-${Math.floor(Math.random() * 200)}`,
-      publicKey: userData.publicKey || null, // Handle optional publicKey
-      challenge: userData.challenge || null,  // Handle optional challenge
-      counter: 0,  // Default value for counter
-      created_at: new Date().toISOString(), // Handle timestamp
+      publicKey: userData.publicKey || null,
+      challenge: userData.challenge || null,
+      counter: 0,
+      created_at: new Date().toISOString(),
+      leaves: userData.leaves || [],
+      attendance: userData.attendance || [],
     });
-  
-    // Save user and return
+
     const savedUser = await this.userRepository.save(newUser);
     console.log(savedUser, 'User created successfully');
     return savedUser;
   }
-  
 
-async updateUser(id: number, user: Partial<User>): Promise<User> {
-  const {id: userId, ...userData} = user; 
-  const updated = await this.userRepository.update(id, userData); 
-  console.log(updated,)
-  const updatedUser = await this.userRepository.findOne({ where: { id } });
-  return updatedUser; 
-}
+  async updateUser(id: number, userData: Partial<User>): Promise<User> {
+    const user = await this.getOneUser(id);
 
-  async deleteUser(id: number): Promise<void> {
-    await this.userRepository.delete(id);
+    const updatedUser = this.userRepository.merge(user, userData);
+    return this.userRepository.save(updatedUser);
   }
 
-async findById(userId: number): Promise<User | undefined> {
-  return this.userRepository.findOne({ where: { id: userId } });
-}
+  async deleteUser(id: number): Promise<void> {
+    const user = await this.getOneUser(id);
+    await this.userRepository.remove(user);
+  }
 
+  async findById(userId: number): Promise<User | undefined> {
+    return this.userRepository.findOne({ 
+      where: { id: userId }, 
+      relations: ['leaves', 'attendance'] 
+    });
+  }
 
   async registerFingerprint(id: number, publicKey: string): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id } });
-    if (!user) {
-      throw new Error('User not found');
-    }
+    const user = await this.getOneUser(id);
 
     user.publicKey = publicKey;
     return this.userRepository.save(user);
   }
 
   async findByFingerprint(fingerprint: string): Promise<User | null> {
-    return await this.userRepository.findOne({ where: { publicKey: fingerprint } });
+    return this.userRepository.findOne({
+      where: { publicKey: fingerprint },
+      relations: ['leaves', 'attendance']
+    });
+  }
+
+  async getUserWithAttendanceAndLeaves(userId: number): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['leaves', 'attendance'],
+    });
   }
 }

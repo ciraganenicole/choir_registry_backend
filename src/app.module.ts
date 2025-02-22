@@ -8,13 +8,17 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { WebAuthnModule } from './webauthn/webauthn.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { JustificationModule } from './justification/justification.module';
+import { LeaveModule } from './leave/leave.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     UsersModule,
-    WebAuthnModule,
+    // WebAuthnModule,
     AttendanceModule,
+    JustificationModule, 
+    LeaveModule, 
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST || 'localhost',  // Default to 'db'

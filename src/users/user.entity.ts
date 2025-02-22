@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, BeforeInsert, OneToMany } from 'typeorm';
 import { Attendance } from '../attendance/attendance.entity';
+import { Leave } from '../leave/leave.entity';
 
 @Entity('users')
 export class User {
@@ -31,7 +32,10 @@ publicKey?: string | null;
   @Column({ type: 'text', nullable: true }) // Add this column
   credentialID: string;
 
-@OneToMany(() => Attendance, (attendance) => attendance.user)
+  @OneToMany(() => Leave, (leave) => leave.user, { cascade: true })
+  leaves: Leave[];
+
+  @OneToMany(() => Attendance, (attendance) => attendance.user, { cascade: true })
   attendance: Attendance[];
 
 @Column({ default: () => 'CURRENT_TIMESTAMP' })

@@ -184,7 +184,7 @@ console.log(Buffer.from(user.credentialID, 'base64url').toString('hex'), 'UUUUUU
       user.challenge = null;
       await this.userRepository.save(user);
     
-      await this.attendanceService.markAttendance(user.id, credential);
+      // await this.attendanceService.markAttendance(user.id);
     
       return { success: true };
     }

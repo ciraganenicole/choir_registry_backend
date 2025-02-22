@@ -5,16 +5,18 @@ import { AttendanceController } from './attendance.controller';
 import { Attendance } from './attendance.entity';
 import { User } from '../users/user.entity';
 import { UsersModule } from '../users/users.module';
-import { WebAuthnModule } from '../webauthn/webauthn.module';
+import { LeaveModule } from '../leave/leave.module';
+import { JustificationModule } from '../justification/justification.module'; // Correctly importing JustificationModule
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Attendance, User]),
     UsersModule,
-    forwardRef(() => WebAuthnModule), // Resolving circular dependency for WebAuthnService
+    LeaveModule,
+    forwardRef(() => JustificationModule),
   ],
   providers: [AttendanceService],
   controllers: [AttendanceController],
-  exports: [AttendanceService],
+  exports: [AttendanceService],  // Ensure AttendanceService is exported
 })
 export class AttendanceModule {}
