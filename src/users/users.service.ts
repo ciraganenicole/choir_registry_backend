@@ -21,8 +21,9 @@ export class UsersService {
     return user;
   }
 
-  async getAllUsers(): Promise<User[]> {
-    return this.userRepository.find({ relations: ['leaves', 'attendance'] });
+  async getAllUsers(includeAttendance: boolean): Promise<User[]> {
+    const relations = includeAttendance ? ['leaves', 'attendance'] : [];
+    return this.userRepository.find({ relations });
   }
 
   async createUser(userData: any): Promise<User> {

@@ -106,6 +106,18 @@ export class AttendanceController {
     }
   }
 
+  // ✅ Get weekly attendance for the current week (Monday to Sunday)
+  @Get('week')
+  async getWeeklyAttendance() {
+    try {
+      const weeklyAttendance = await this.attendanceService.getWeeklyAttendance();
+      return { success: true, data: weeklyAttendance };
+    } catch (error) {
+      console.error('Error fetching weekly attendance:', error);
+      throw new InternalServerErrorException('Failed to fetch weekly attendance');
+    }
+  }
+
   // ✅ Get attendance counts for a specific day
 @Get('count/:date')
 async getAttendanceCountByDate(@Param('date') date: string) {

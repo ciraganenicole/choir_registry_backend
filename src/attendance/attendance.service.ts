@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { Attendance, AttendanceStatus } from './attendance.entity';
 import { UsersService } from '../users/users.service';
 
@@ -31,6 +31,40 @@ export class AttendanceService {
       relations: ['user'],
     });
   }
+
+  async getWeeklyAttendance(): Promise<any> {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+  
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+  
+    const mondayString = monday.toISOString().split('T')[0];
+    const sundayString = sunday.toISOString().split('T')[0];
+  
+    // Debug: Log the calculated dates
+    console.log(`Monday: ${mondayString}, Sunday: ${sundayString}`);
+  
+    // Filter attendance records for the week
+    const weeklyAttendance = await this.attendanceRepository.find({
+      where: {
+        date: Between(mondayString, sundayString),
+      },
+      relations: ['user'],
+    });
+  
+    // Debug: Log fetched attendance records
+    console.log('Weekly Attendance Records:', weeklyAttendance);
+  
+    return weeklyAttendance;
+  }
+  
+  
+  
 
   async markAttendance(userId: number, status: AttendanceStatus): Promise<any> {
     const user = await this.usersService.getUserWithAttendanceAndLeaves(userId);
