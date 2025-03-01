@@ -1,15 +1,24 @@
 import { DataSource } from 'typeorm';
-import { User } from './users/user.entity';
+import { User } from './modules/users/user.entity';
+import { AdminUser } from './modules/admin/admin_users.entity';
+import { Attendance } from './modules/attendance/attendance.entity';
+import { Leave } from './modules/leave/leave.entity';
+import { Event } from './modules/events/event.entity';
+import { config } from 'dotenv';
+import { Transaction } from './modules/transactions/transactions.entity';
+config();
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
-  host: 'localhost',
-  port: 5432,
-  username: 'postgres',
-  password: '2022',
-  database: 'choir_registry',
-  entities: [__dirname + '/**/*.entity{.ts,.js}'],
-  migrations: ['src/migrations/*.ts'],  // Make sure migrations path is correct
-  synchronize: false, // Should be false in production
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT || '5432'),
+  username: process.env.DB_USERNAME,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
+  entities: [User, AdminUser, Attendance, Event, Leave, Transaction],
+  migrations: ['dist/database/migrations/*.js'],
+  synchronize: false,
   logging: true,
 });
+
+

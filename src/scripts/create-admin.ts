@@ -1,0 +1,142 @@
+import { DataSource } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { AdminUser } from '../modules/admin/admin_users.entity';
+import { AdminRole } from '../modules/admin/admin-role.enum';
+import { config } from 'dotenv';
+import { Table } from 'typeorm';
+
+config();
+
+const createAdmin = async () => {
+  const dataSource = new DataSource({
+    type: 'postgres',
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || '5432'),
+    username: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
+    entities: [AdminUser],
+    logging: true,
+  });
+
+  try {
+    console.log('Connecting to database with settings:', {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      username: process.env.DB_USERNAME,
+      database: process.env.DB_DATABASE,
+    });
+
+    await dataSource.initialize();
+    console.log('Database connected successfully');
+
+    const queryRunner = dataSource.createQueryRunner();
+    const tableExists = await queryRunner.hasTable('admin_users');
+    console.log('admin_users table exists:', tableExists);
+
+    if (!tableExists) {
+      console.log('Creating admin_users table...');
+      await queryRunner.createTable(
+        new Table({
+          name: 'admin_users',
+          columns: [
+            {
+              name: 'id',
+              type: 'uuid',
+              isPrimary: true,
+              generationStrategy: 'uuid',
+              default: 'uuid_generate_v4()',
+            },
+            {
+              name: 'email',
+              type: 'varchar',
+              isUnique: true,
+            },
+            {
+              name: 'password',
+              type: 'varchar',
+            },
+            {
+              name: 'name',
+              type: 'varchar',
+            },
+            {
+              name: 'role',
+              type: 'enum',
+              enum: Object.values(AdminRole),
+            },
+            {
+              name: 'created_at',
+              type: 'timestamp',
+              default: 'CURRENT_TIMESTAMP',
+            },
+            {
+              name: 'is_active',
+              type: 'boolean',
+              default: true,
+            },
+          ],
+        }),
+        true
+      );
+    }
+
+    const adminRepository = dataSource.getRepository(AdminUser);
+    
+    const existingAdmins = await adminRepository.find();
+    console.log('Existing admins:', existingAdmins);
+
+    const hashedPassword = await bcrypt.hash('password123', 10);
+
+    const admins = [
+      {
+        email: 'superadmin@example.com',
+        name: 'Super Admin',
+        role: AdminRole.SUPER_ADMIN,
+      },
+      {
+        email: 'adminlouado@example.com',
+        name: 'Louado Admin',
+        role: AdminRole.LOUADO_ADMIN,
+      },
+      {
+        email: 'adminadmin@example.com',
+        name: 'Administration Admin',
+        role: AdminRole.ADMINISTRATION_ADMIN,
+      },
+      {
+        email: 'admincaisse@example.com',
+        name: 'Caisse Admin',
+        role: AdminRole.CAISSE_ADMIN,
+      },
+    ];
+
+    for (const adminData of admins) {
+      try {
+        const existingAdmin = await adminRepository.findOne({
+          where: { email: adminData.email },
+        });
+
+        if (!existingAdmin) {
+          const admin = adminRepository.create({
+            ...adminData,
+            password: hashedPassword,
+            isActive: true,
+          });
+          await adminRepository.save(admin);
+          console.log(`Created admin: ${adminData.email}`);
+        } else {
+          console.log(`Admin already exists: ${adminData.email}`);
+        }
+      } catch (error) {
+        console.error(`Error creating admin ${adminData.email}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Database error:', error);
+  } finally {
+    await dataSource.destroy();
+  }
+};
+
+createAdmin(); 

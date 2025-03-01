@@ -1,35 +1,43 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { User } from './users/user.entity';
-import { UsersModule } from './users/users.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { UsersModule } from './modules/users/users.module';
+import { LeaveModule } from './modules/leave/leave.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { AuthModule } from './auth/auth.module';
-import { WebAuthnModule } from './webauthn/webauthn.module';
-import { AttendanceModule } from './attendance/attendance.module';
-import { JustificationModule } from './justification/justification.module';
-import { LeaveModule } from './leave/leave.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { EventsModule } from './modules/events/events.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { TransactionModule } from './modules/transactions/transactions.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
-    UsersModule,
-    // WebAuthnModule,
-    AttendanceModule,
-    JustificationModule, 
-    LeaveModule, 
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',  // Default to 'db'
-      port: parseInt(process.env.DB_PORT) || 5432,
-      username: process.env.DB_USERNAME || 'postgres',  // Ensure correct key
-      password: process.env.DB_PASSWORD || '2022',
-      database: process.env.DB_NAME || 'choir_registry',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      synchronize: true,
+    ConfigModule.forRoot({
+      isGlobal: true,
     }),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres',
+        host: configService.get('DB_HOST'),
+        port: configService.get('DB_PORT'),
+        username: configService.get('DB_USERNAME'),
+        password: configService.get('DB_PASSWORD'),
+        database: configService.get('DB_DATABASE'),
+        entities: ['dist/**/*.entity{.ts,.js}'],
+        synchronize: false,
+      }),
+      inject: [ConfigService],
+    }),
+    AdminModule,
+    UsersModule,
+    LeaveModule,
+    AttendanceModule,
     AuthModule,
+    EventsModule,
+    TransactionModule
+
   ],
   controllers: [AppController],
   providers: [AppService],
