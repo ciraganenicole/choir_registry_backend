@@ -56,7 +56,7 @@ export class TransactionsService {
     userId?: number;
     category?: TransactionCategories;
     subcategory?: string;
-    date?: Date;
+    dateRange?: { from: Date; to: Date };
     amount?: number;
   }): Promise<Transaction[]> {
     const where: any = {};
@@ -67,7 +67,9 @@ export class TransactionsService {
 
     if (filters.subcategory) where.subcategory = filters.subcategory;
 
-    if (filters.date) where.date = filters.date;
+    if (filters.dateRange) {
+      where.date = Between(filters.dateRange.from, filters.dateRange.to);
+    }
 
     if (filters.amount !== undefined) {
       where.amount = filters.amount;

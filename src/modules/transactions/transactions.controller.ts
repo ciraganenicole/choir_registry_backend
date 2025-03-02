@@ -58,15 +58,17 @@ export class TransactionsController {
     @Query('userId') userId?: number,
     @Query('category') category?: TransactionCategories,
     @Query('subcategory') subcategory?: string,
-    @Query('date') date?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
     @Query('amount') amount?: number,
   ): Promise<Transaction[]> {
+    console.log('Filters:', { userId, category, subcategory, amount });
 
     return await this.transactionsService.getTransactions({
       userId,
       category,
+      dateRange: dateFrom && dateTo ? { from: new Date(dateFrom), to: new Date(dateTo) } : undefined,
       subcategory,
-      date: date ? new Date(date) : undefined,
       amount,
     });
   }
