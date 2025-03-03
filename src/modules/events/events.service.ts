@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Event } from './event.entity';
 import { EventType } from './event-type.enum';
-import { UserCategory } from '../users/user-category.enum';
+import { UserCategory } from '../users/enums/user-category.enum';
 
 @Injectable()
 export class EventsService {

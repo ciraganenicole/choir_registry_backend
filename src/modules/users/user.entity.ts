@@ -1,8 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, BeforeInsert } from 'typeorm';
-import { UserCategory } from './user-category.enum';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
+import { Gender } from './enums/gender.enum';
+import { MaritalStatus } from './enums/marital-status.enum';
+import { EducationLevel } from './enums/education-level.enum';
+import { Profession } from './enums/profession.enum';
+import { Commune } from './enums/commune.enum';
+import { Commission } from './enums/commission.enum';
 import { Attendance } from '../attendance/attendance.entity';
 import { Leave } from '../leave/leave.entity';
-import { VoiceCategory } from './voice-category.enum';
+import { UserCategory } from './enums/user-category.enum';
 
 @Entity('users')
 export class User {
@@ -10,16 +15,73 @@ export class User {
     id: number;
 
     @Column()
-    name: string;
+    firstName: string; // PRENOM
 
     @Column()
-    surname: string;
+    lastName: string; // NOMS
+
+    @Column({
+        type: 'enum',
+        enum: Gender
+    })
+    gender: Gender; // SEXE
+
+    @Column({
+        type: 'enum',
+        enum: MaritalStatus
+    })
+    maritalStatus: MaritalStatus; // ETAT CIVIL
+
+    @Column({
+        type: 'enum',
+        enum: EducationLevel
+    })
+    educationLevel: EducationLevel;
+
+    @Column({
+        type: 'enum',
+        enum: Profession
+    })
+    profession: Profession;
+
+    @Column({ nullable: true })
+    competenceDomain: string; // DOMAINE DE COMPETENCE
+
+    @Column()
+    churchOfOrigin: string; // EGLISE DE PROVENANCE
+
+    @Column({
+        type: 'enum',
+        enum: Commune
+    })
+    commune: Commune;
+
+    @Column()
+    quarter: string; // QUARTIER
+
+    @Column()
+    reference: string; // REFERENCE
+
+    @Column()
+    address: string; // AVENUE/N°
 
     @Column({ unique: true })
+    phoneNumber: string; // TELEPHONE MOBILE
+
+    @Column({ nullable: true })
+    whatsappNumber: string; // NUMERO WHATSAPP
+
+    @Column({ unique: true })
+    email: string;
+
+    @Column({ nullable: true })
+    phone: string;
+
+    @Column('text', { array: true, default: [] })
+    commissions: Commission[];
+
+    @Column({ nullable: true })
     matricule: string;
-
-    @Column({ unique: true })
-    phoneNumber: string;
 
     @Column('text', { array: true, default: [] })
     categories: UserCategory[];
@@ -27,8 +89,8 @@ export class User {
     @Column({ nullable: true })
     fingerprintData: string;
 
-    @Column()
-    voiceCategory: VoiceCategory;
+    @Column({ nullable: true })
+    voiceCategory: string;
 
     @Column({ nullable: true })
     joinDate: Date;
@@ -36,15 +98,15 @@ export class User {
     @Column({ default: true })
     isActive: boolean;
 
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
+
     @OneToMany(() => Attendance, attendance => attendance.user)
     attendance: Attendance[];
 
     @OneToMany(() => Leave, leave => leave.user)
     leaves: Leave[];
-
-    // Before inserting a new user, generate matricule
-    @BeforeInsert()
-    generateMatricule() {
-        this.matricule = `NJC-${this.id}`; // Format matricule as 'NJC-userId'
-    }
 } 

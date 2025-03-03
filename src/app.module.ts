@@ -9,7 +9,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { EventsModule } from './modules/events/events.module';
 import { AdminModule } from './modules/admin/admin.module';
-import { TransactionModule } from './modules/transactions/transactions.module';
+import { TransactionModule } from './modules/transactions/transaction.module';
 
 @Module({
   imports: [
@@ -37,7 +37,6 @@ import { TransactionModule } from './modules/transactions/transactions.module';
     AuthModule,
     EventsModule,
     TransactionModule
-
   ],
   controllers: [AppController],
   providers: [AppService],

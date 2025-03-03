@@ -1,0 +1,12 @@
+export enum EducationLevel {
+    NONE = 'N/A',
+    CERTIFICATE = 'CERTIFICAT',
+    A3 = 'A3',
+    A2 = 'A2',
+    INCOMPLETE_HUMANITIES = 'HUMANITE_INCOMPLETE',
+    STATE_DIPLOMA = 'DIPLOME_ETAT',
+    GRADUATE = 'GRADUE',
+    BACHELOR = 'LICENCIE',
+    MASTER = 'MASTER',
+    DOCTOR = 'DOCTEUR'
+} 

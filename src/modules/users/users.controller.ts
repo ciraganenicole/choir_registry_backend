@@ -10,13 +10,15 @@ import {
   ParseIntPipe,
   ValidationPipe,
   UsePipes,
+  Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { CreateUserDto, UpdateUserDto } from '../../common/dtos/user.dto';
 import { UsersService } from './users.service';
-import { UserCategory } from './user-category.enum';
+import { UserCategory } from './enums/user-category.enum';
 import { API_ROUTES } from '../../common/routes/api.routes';
+import { UserFilterDto } from '../../common/dtos/user-filter.dto';
 
 @ApiTags('Users')
 @Controller()
@@ -24,10 +26,23 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get(API_ROUTES.USERS.BASE)
-  @ApiOperation({ summary: 'Get all users' })
-  @ApiQuery({ name: 'includeAttendance', required: false, type: Boolean })
-  async getUsers(): Promise<User[]> {
-    return this.usersService.getAllUsers();
+  @ApiOperation({ summary: 'Get all users with filters and pagination' })
+  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'sortBy', required: false })
+  @ApiQuery({ name: 'order', required: false })
+  @ApiQuery({ name: 'letter', required: false })
+  async getUsers(
+    @Query(ValidationPipe) filterDto: UserFilterDto
+  ): Promise<{ data: User[]; total: number; page: number; limit: number }> {
+    const [users, total] = await this.usersService.getAllUsers(filterDto);
+    return {
+      data: users,
+      total,
+      page: filterDto.page || 1,
+      limit: filterDto.limit || 10
+    };
   }
 
   @Get(API_ROUTES.USERS.BY_ID)

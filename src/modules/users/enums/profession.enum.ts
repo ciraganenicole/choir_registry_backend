@@ -1,0 +1,6 @@
+export enum Profession {
+    FREELANCE = 'LIBERAL',
+    CIVIL_SERVANT = 'FONCTIONNAIRE',
+    NGO_WORKER = 'AGENT_ONG',
+    UNEMPLOYED = 'SANS_EMPLOI'
+} 

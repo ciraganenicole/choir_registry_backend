@@ -1,10 +1,20 @@
 // src/transactions/transactions-categories.enum.ts
 
-export enum TransactionCategories {
+export enum TransactionType {
+  INCOME = 'INCOME',
+  EXPENSE = 'EXPENSE'
+}
+
+// Categories for Income type transactions
+export enum IncomeCategories {
   DAILY = 'DAILY',
-  SPECIAL = 'SPECIAL',
   DONATION = 'DONATION',
+  SPECIAL = 'SPECIAL',
   OTHER = 'OTHER',
+}
+
+// Categories for Expense type transactions
+export enum ExpenseCategories {
   CHARITY = 'CHARITY',
   MAINTENANCE = 'MAINTENANCE',
   TRANSPORT = 'TRANSPORT',
@@ -12,6 +22,9 @@ export enum TransactionCategories {
   COMMUNICATION = 'COMMUNICATION',
   RESTAURATION = 'RESTAURATION',
 }
+
+// Combined categories type for easier usage
+export type TransactionCategories = IncomeCategories | ExpenseCategories;
 
 export const Subcategories = {
   CHARITY: {
@@ -30,5 +43,15 @@ export const Subcategories = {
   },
   // Add other categories and subcategories here
 };
+
+export type SubcategoryType = typeof Subcategories[keyof typeof Subcategories][keyof typeof Subcategories[keyof typeof Subcategories]];
+
+// Helper function to validate category matches transaction type
+export function isCategoryValidForType(category: TransactionCategories, type: TransactionType): boolean {
+  if (type === TransactionType.INCOME) {
+    return Object.values(IncomeCategories).includes(category as IncomeCategories);
+  }
+  return Object.values(ExpenseCategories).includes(category as ExpenseCategories);
+}
 
 

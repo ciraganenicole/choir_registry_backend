@@ -1,70 +1,171 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
-import { Transaction } from '../../modules/transactions/transactions.entity';
-import { TransactionCategories, Subcategories } from '../../modules/transactions/transactions-categories.enum';
+import { DataSource } from 'typeorm';
+import { Seeder } from 'typeorm-extension';
 
-@Injectable()
-export class TransactionsSeedService {
-  constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-  ) {}
+import { Transaction } from '../../modules/transactions/transaction.entity';
+import {
+  ExpenseCategories,
+  IncomeCategories,
+  TransactionType,
+} from '../../modules/transactions/transactions-categories.enum';
+import { User } from '../../modules/users/user.entity';
 
-  // Function to generate a random transaction without faker
-  private generateRandomTransaction(): Partial<Transaction> {
-    const categories = Object.values(TransactionCategories);
+export class TransactionSeeder implements Seeder {
+  async run(dataSource: DataSource): Promise<void> {
+    const transactionRepository = dataSource.getRepository(Transaction);
+    const userRepository = dataSource.getRepository(User);
 
-    // Filter categories that have subcategories
-    const categoriesWithSubcategories = categories.filter((category) => 
-      this.isCategoryWithSubcategories(category)
-    );
+    // Get some users for contributions
+    const users = await userRepository.find({ take: 5 });
 
-    const category = categoriesWithSubcategories[Math.floor(Math.random() * categoriesWithSubcategories.length)];
-    let subcategory: string | undefined = undefined;
+    const transactions = [
+      // Daily contributions from registered members
+      ...users.map((user) => ({
+        amount: 500,
+        type: TransactionType.INCOME,
+        category: IncomeCategories.DAILY,
+        description: 'Daily contribution',
+        transactionDate: new Date().toISOString().split('T')[0],
+        contributor: user,
+      })),
 
-    // If category has subcategories, get one randomly
-    if (this.isCategoryWithSubcategories(category)) {
-      subcategory = this.getRandomSubcategory(category);
-    }
+      // External contributors (donations)
+      {
+        amount: 50000,
+        type: TransactionType.INCOME,
+        category: IncomeCategories.DONATION,
+        description: 'Wedding celebration donation',
+        transactionDate: new Date().toISOString().split('T')[0],
+        externalContributorName: 'John Smith',
+        externalContributorPhone: '+237612345678',
+      },
+      {
+        amount: 25000,
+        type: TransactionType.INCOME,
+        category: IncomeCategories.DONATION,
+        description: 'Birthday celebration donation',
+        transactionDate: new Date().toISOString().split('T')[0],
+        externalContributorName: 'Marie Claire',
+        externalContributorPhone: '+237623456789',
+      },
 
-    // Static name or dynamic name generation
-    const names = ['John Doe', 'Jane Smith', 'Alice Johnson', 'Bob Brown']; // Example name list
-    const fullname = names[Math.floor(Math.random() * names.length)];
+      // Special contributions from members
+      {
+        amount: 15000,
+        type: TransactionType.INCOME,
+        category: IncomeCategories.SPECIAL,
+        description: 'Easter celebration contribution',
+        transactionDate: new Date().toISOString().split('T')[0],
+        contributor: users[0],
+      },
+      {
+        amount: 20000,
+        type: TransactionType.INCOME,
+        category: IncomeCategories.SPECIAL,
+        description: 'Christmas celebration contribution',
+        transactionDate: new Date().toISOString().split('T')[0],
+        contributor: users[1],
+      },
 
-    return {
-      userId: Math.floor(Math.random() * 10) + 1, // Random userId between 1 and 10
-      fullname, // Random full name
-      amount: Math.random() * (500 - 10) + 10, // Random amount between 10 and 500
-      category,
-      subcategory,
-      date: new Date(),
-    };
-  }
+      // External special contributions
+      {
+        amount: 100000,
+        type: TransactionType.INCOME,
+        category: IncomeCategories.SPECIAL,
+        description: 'Special event contribution',
+        transactionDate: new Date().toISOString().split('T')[0],
+        externalContributorName: 'Robert Johnson',
+        externalContributorPhone: '+237634567890',
+      },
 
-  // Type guard to check if the category has subcategories
-  private isCategoryWithSubcategories(category: TransactionCategories): boolean {
-    return category in Subcategories;
-  }
+      // Expenses - Charity
+      {
+        amount: 75000,
+        type: TransactionType.EXPENSE,
+        category: ExpenseCategories.CHARITY,
+        subcategory: 'ILLNESS',
+        description: 'Medical assistance for member',
+        transactionDate: new Date().toISOString().split('T')[0],
+      },
+      {
+        amount: 50000,
+        type: TransactionType.EXPENSE,
+        category: ExpenseCategories.CHARITY,
+        subcategory: 'DEATH',
+        description: 'Funeral assistance',
+        transactionDate: new Date().toISOString().split('T')[0],
+      },
 
-  // Get a random subcategory based on the expense category
-  private getRandomSubcategory(category: TransactionCategories): string {
-    const subcategories = Object.values(Subcategories[category as keyof typeof Subcategories]) as string[];
-    return subcategories[Math.floor(Math.random() * subcategories.length)];
-  }
+      // Expenses - Maintenance
+      {
+        amount: 25000,
+        type: TransactionType.EXPENSE,
+        category: ExpenseCategories.MAINTENANCE,
+        subcategory: 'MAINTENANCE',
+        description: 'Equipment repair',
+        transactionDate: new Date().toISOString().split('T')[0],
+      },
+      {
+        amount: 150000,
+        type: TransactionType.EXPENSE,
+        category: ExpenseCategories.MAINTENANCE,
+        subcategory: 'BUY_DEVICES',
+        description: 'New sound system',
+        transactionDate: new Date().toISOString().split('T')[0],
+      },
 
-  // Seed the database with random transactions
-  async seedTransactions() {
-    const transactions = Array.from({ length: 50 }).map(() => this.generateRandomTransaction()); // Generate 50 random transactions
+      // Expenses - Transport
+      {
+        amount: 35000,
+        type: TransactionType.EXPENSE,
+        category: ExpenseCategories.TRANSPORT,
+        subcategory: 'COMMITTEE',
+        description: 'Committee meeting transport',
+        transactionDate: new Date().toISOString().split('T')[0],
+      },
+      {
+        amount: 45000,
+        type: TransactionType.EXPENSE,
+        category: ExpenseCategories.TRANSPORT,
+        subcategory: 'SORTIE',
+        description: 'Choir outing transport',
+        transactionDate: new Date().toISOString().split('T')[0],
+      },
 
-    await this.transactionsRepository.save(transactions);
-    console.log('Random transactions have been seeded.');
+      // Other expenses
+      {
+        amount: 15000,
+        type: TransactionType.EXPENSE,
+        category: ExpenseCategories.COMMUNICATION,
+        description: 'Phone credit for announcements',
+        transactionDate: new Date().toISOString().split('T')[0],
+      },
+      {
+        amount: 85000,
+        type: TransactionType.EXPENSE,
+        category: ExpenseCategories.RESTAURATION,
+        description: 'Refreshments for special event',
+        transactionDate: new Date().toISOString().split('T')[0],
+      },
+      {
+        amount: 65000,
+        type: TransactionType.EXPENSE,
+        category: ExpenseCategories.SPECIAL_ASSISTANCE,
+        description: 'Emergency assistance',
+        transactionDate: new Date().toISOString().split('T')[0],
+      },
+    ];
+
+    // Add some transactions with different dates
+    const pastTransactions = transactions.map((transaction) => ({
+      ...transaction,
+      transactionDate: new Date(
+        Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000,
+      )
+        .toISOString()
+        .split('T')[0],
+    }));
+
+    await transactionRepository.save([...transactions, ...pastTransactions]);
   }
 }
-export const seedTransactions = async (dataSource: DataSource) => {
-  const transactionRepository = dataSource.getRepository(Transaction);
-  const service = new TransactionsSeedService(transactionRepository);
 
-  await service.seedTransactions();
-  console.log('Transactions seeding completed.');
-};

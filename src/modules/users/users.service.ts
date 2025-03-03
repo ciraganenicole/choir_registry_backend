@@ -1,11 +1,12 @@
 /* eslint-disable prettier/prettier */
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like, ILike } from 'typeorm';
 import { User } from './user.entity';
 import { CreateUserDto, UpdateUserDto } from '../../common/dtos/user.dto';
-import { UserCategory } from './user-category.enum';
+import { UserCategory } from './enums/user-category.enum';
 import { Event } from '../events/event.entity';
+import { UserFilterDto } from '../../common/dtos/user-filter.dto';
 
 @Injectable()
 export class UsersService {
@@ -14,14 +15,81 @@ export class UsersService {
         private userRepository: Repository<User>
     ) {}
 
-    async getAllUsers(): Promise<User[]> {
-        return this.userRepository.find({
-            relations: ['attendance', 'attendance.event', 'leaves'],
-            order: {
-                name: 'ASC',
-                surname: 'ASC'
-            }
-        });
+    async getAllUsers(filterDto: UserFilterDto): Promise<[User[], number]> {
+        const {
+            search,
+            gender,
+            maritalStatus,
+            educationLevel,
+            profession,
+            commune,
+            commission,
+            category,
+            page = 1,
+            limit = 10,
+            sortBy = 'firstName',
+            order = 'ASC',
+            letter
+        } = filterDto;
+
+        const query = this.userRepository.createQueryBuilder('user');
+
+        // Add relations
+        query.leftJoinAndSelect('user.attendance', 'attendance')
+             .leftJoinAndSelect('attendance.event', 'event')
+             .leftJoinAndSelect('user.leaves', 'leaves');
+
+        // Apply filters
+        if (search) {
+            query.andWhere(
+                '(LOWER(user.firstName) LIKE LOWER(:search) OR LOWER(user.lastName) LIKE LOWER(:search) OR LOWER(user.email) LIKE LOWER(:search))',
+                { search: `%${search}%` }
+            );
+        }
+
+        if (letter) {
+            query.andWhere('LOWER(user.firstName) LIKE LOWER(:letter)', { letter: `${letter}%` });
+        }
+
+        if (gender) {
+            query.andWhere('user.gender = :gender', { gender });
+        }
+
+        if (maritalStatus) {
+            query.andWhere('user.maritalStatus = :maritalStatus', { maritalStatus });
+        }
+
+        if (educationLevel) {
+            query.andWhere('user.educationLevel = :educationLevel', { educationLevel });
+        }
+
+        if (profession) {
+            query.andWhere('user.profession = :profession', { profession });
+        }
+
+        if (commune) {
+            query.andWhere('user.commune = :commune', { commune });
+        }
+
+        if (commission) {
+            query.andWhere(':commission = ANY(user.commissions)', { commission });
+        }
+
+        if (category) {
+            query.andWhere(':category = ANY(user.categories)', { category });
+        }
+
+        // Apply sorting
+        if (sortBy) {
+            query.orderBy(`user.${sortBy}`, order);
+        }
+
+        // Apply pagination
+        query.skip((page - 1) * limit)
+             .take(limit);
+
+        const [users, total] = await query.getManyAndCount();
+        return [users, total];
     }
 
     async getOneUser(id: number): Promise<User> {
@@ -83,8 +151,8 @@ export class UsersService {
             where: { categories: category },
             relations: ['attendance', 'attendance.event', 'leaves'],
             order: {
-                name: 'ASC',
-                surname: 'ASC'
+                firstName: 'ASC',
+                lastName: 'ASC'
             }
         });
     }
@@ -122,8 +190,8 @@ export class UsersService {
             .leftJoinAndSelect('user.attendance', 'attendance')
             .leftJoinAndSelect('attendance.event', 'event')
             .where('event.type = :eventType', { eventType })
-            .orderBy('user.name', 'ASC')
-            .addOrderBy('user.surname', 'ASC')
+            .orderBy('user.firstName', 'ASC')
+            .addOrderBy('user.lastName', 'ASC')
             .getMany();
     }
 }

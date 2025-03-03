@@ -4,7 +4,7 @@ import { EventsService } from './events.service';
 import { Event } from './event.entity';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { EventType } from './event-type.enum';
-import { UserCategory } from '../users/user-category.enum';
+import { UserCategory } from '../users/enums/user-category.enum';
 
 @ApiTags('Events')
 @Controller('events')

@@ -1,31 +1,43 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
-import { User } from '../users/user.entity';
-import { Attendance } from '../attendance/attendance.entity';
-import { UserCategory } from '../users/user-category.enum';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { EventType } from './event-type.enum';
+import { Attendance } from '../attendance/attendance.entity';
+import { UserCategory } from '../users/enums/user-category.enum';
 
-@Entity()
+@Entity('events')
 export class Event {
     @PrimaryGeneratedColumn()
     id: number;
 
     @Column()
-    name: string; // e.g., "Rehearsal", "Sunday Service"
+    name: string;
 
-    @Column({ type: 'enum', enum: EventType })
-    type: EventType; // e.g., REGULAR, RANDOM, SPECIAL
+    @Column({
+        type: 'enum',
+        enum: EventType
+    })
+    type: EventType;
 
-    @Column({ nullable: true })
-    category: UserCategory; // e.g., Worshippers, Musicians
+    @Column({
+        type: 'enum',
+        enum: UserCategory,
+        nullable: true
+    })
+    category: UserCategory;
 
     @Column({ type: 'date' })
-    date: string;
+    date: Date;
 
     @Column({ type: 'time' })
     startTime: string;
 
     @Column({ type: 'time' })
     endTime: string;
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
 
     @OneToMany(() => Attendance, attendance => attendance.event)
     attendance: Attendance[];

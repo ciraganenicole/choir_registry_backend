@@ -16,7 +16,7 @@ import {
   subMonths,
   subYears 
 } from 'date-fns';
-import { UserCategory } from '../users/user-category.enum';
+import { UserCategory } from '../users/enums/user-category.enum';
 import { EventsService } from '../events/events.service';
 
 @Injectable()
@@ -48,8 +48,8 @@ export class AttendanceService {
       throw new ForbiddenException('Access denied: You are not authorized to attend this event.');
     }
 
-    // Check if the event belongs to the allowed categories
-    if (![UserCategory.WORSHIPPER, UserCategory.COMMITTEE].includes(event.category)) {
+    // Before checking event categories, convert string to enum
+    if (!event.category || ![UserCategory.WORSHIPPER, UserCategory.COMMITTEE].includes(event.category as UserCategory)) {
       throw new ForbiddenException('This event is restricted to specific categories.');
     }
 

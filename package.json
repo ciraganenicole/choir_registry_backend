@@ -11,7 +11,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "seed:admin": "ts-node src/database/seeds/run-seeds.ts",
+    "seed:admin": "ts-node src/database/seeds/runSeeds.ts",
     "seed:users": "ts-node src/scripts/seed-users.ts",
     "db:start": "scripts/db.bat start",
     "db:stop": "scripts/db.bat stop",
@@ -24,9 +24,12 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "typeorm": "typeorm",
-    "migration:run": "npx typeorm migration:run -d ./src/data-source.ts",
-    "migration:generate": "npx typeorm migration:generate -d ./src/data-source.ts"
+    "typeorm": "typeorm-ts-node-commonjs",
+    "migration:run": "npm run typeorm -- migration:run -d src/data-source.ts",
+    "migration:generate": "npm run typeorm -- migration:generate -d src/data-source.ts",
+    "migration:create": "typeorm-ts-node-commonjs migration:create",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/data-source.ts",
+    "seed": "ts-node src/database/seeds/runSeed.ts"
   },
   "dependencies": {
     "@faker-js/faker": "^9.5.0",
@@ -52,7 +55,8 @@
     "passport-jwt": "^4.0.1",
     "pg": "^8.13.3",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "typeorm-extension": "^3.7.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -98,5 +102,4 @@
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
-
 }
