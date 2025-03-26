@@ -9,6 +9,14 @@ import { Profession } from '../../modules/users/enums/profession.enum';
 import { Commune } from '../../modules/users/enums/commune.enum';
 import { Commission } from '../../modules/users/enums/commission.enum';
 
+const getProfileImageUrl = (gender: Gender) => {
+  // Using randomuser.me for consistent, gender-specific profile images
+  const randomId = Math.floor(Math.random() * 99);
+  return gender === Gender.MALE 
+      ? `https://randomuser.me/api/portraits/men/${randomId}.jpg`
+      : `https://randomuser.me/api/portraits/women/${randomId}.jpg`;
+};
+
 const usersData = [
   {
     firstName: 'Sarah',
@@ -26,9 +34,14 @@ const usersData = [
     phoneNumber: '+237650123001',
     whatsappNumber: '+237650123001',
     email: 'sarah.j@example.com',
+    phone: '+237650123001',
     commissions: [Commission.SINGING_MUSIC],
     categories: [UserCategory.WORSHIPPER],
-    
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.FEMALE),   
   },
   {
     firstName: 'Michael',
@@ -46,9 +59,14 @@ const usersData = [
     phoneNumber: '+237650123002',
     whatsappNumber: '+237650123002',
     email: 'michael.b@example.com',
+    phone: '+237650123002',
     commissions: [Commission.AESTHETICS],
     categories: [UserCategory.COMMITTEE],
-    
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.MALE), 
   },
   {
     firstName: 'Emily',
@@ -66,9 +84,14 @@ const usersData = [
     phoneNumber: '+237650123003',
     whatsappNumber: '+237650123003',
     email: 'emily.d@example.com',
+    phone: '+237650123003',
     commissions: [],
-    categories: [],
-    
+    categories: [UserCategory.NORMAL],
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.FEMALE), 
   },
   {
     firstName: 'James',
@@ -86,9 +109,14 @@ const usersData = [
     phoneNumber: '+237650123004',
     whatsappNumber: '+237650123004',
     email: 'james.w@example.com',
+    phone: '+237650123004',
     commissions: [Commission.AESTHETICS],
     categories: [UserCategory.WORSHIPPER, UserCategory.COMMITTEE],
-    
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.MALE), 
   },
   {
     firstName: 'David',
@@ -106,9 +134,14 @@ const usersData = [
     phoneNumber: '+237650123005',
     whatsappNumber: '+237650123005',
     email: 'david.t@example.com',
+    phone: '+237650123005',
     commissions: [],
-    categories: [],
-    
+    categories: [UserCategory.NORMAL],
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.MALE), 
   },
   {
     firstName: 'Lisa',
@@ -126,9 +159,14 @@ const usersData = [
     phoneNumber: '+237650123006',
     whatsappNumber: '+237650123006',
     email: 'lisa.a@example.com',
+    phone: '+237650123006',
     commissions: [],
-    categories: [],
-    
+    categories: [UserCategory.NORMAL],
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.FEMALE), 
   },
   {
     firstName: 'Robert',
@@ -146,9 +184,14 @@ const usersData = [
     phoneNumber: '+237650123007',
     whatsappNumber: '+237650123007',
     email: 'robert.t@example.com',
+    phone: '+237650123007',
     commissions: [],
-    categories: [],
-    
+    categories: [UserCategory.NORMAL],
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.MALE), 
   },
   {
     firstName: 'Jennifer',
@@ -166,9 +209,14 @@ const usersData = [
     phoneNumber: '+237650123008',
     whatsappNumber: '+237650123008',
     email: 'jennifer.m@example.com',
+    phone: '+237650123008',
     commissions: [Commission.SINGING_MUSIC],
     categories: [UserCategory.COMMITTEE],
-    
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.FEMALE), 
   },
   {
     firstName: 'Daniel',
@@ -186,9 +234,14 @@ const usersData = [
     phoneNumber: '+237650123009',
     whatsappNumber: '+237650123009',
     email: 'daniel.g@example.com',
+    phone: '+237650123009',
     commissions: [Commission.SINGING_MUSIC],
     categories: [UserCategory.WORSHIPPER],
-    
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.MALE), 
   },
   {
     firstName: 'Michelle',
@@ -206,9 +259,14 @@ const usersData = [
     phoneNumber: '+237650123010',
     whatsappNumber: '+237650123010',
     email: 'michelle.r@example.com',
+    phone: '+237650123010',
     commissions: [],
-    categories: [],
-    
+    categories: [UserCategory.NORMAL],
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.FEMALE), 
   },
   {
     firstName: 'Kevin',
@@ -226,9 +284,14 @@ const usersData = [
     phoneNumber: '+237650123011',
     whatsappNumber: '+237650123011',
     email: 'kevin.l@example.com',
+    phone: '+237650123011',
     commissions: [Commission.AESTHETICS],
     categories: [UserCategory.COMMITTEE],
-    
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.MALE), 
   },
   {
     firstName: 'Amanda',
@@ -246,9 +309,14 @@ const usersData = [
     phoneNumber: '+237650123012',
     whatsappNumber: '+237650123012',
     email: 'amanda.w@example.com',
+    phone: '+237650123012',
     commissions: [Commission.SINGING_MUSIC],
     categories: [UserCategory.WORSHIPPER],
-    
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.FEMALE), 
   },
   {
     firstName: 'Christopher',
@@ -266,9 +334,14 @@ const usersData = [
     phoneNumber: '+237650123013',
     whatsappNumber: '+237650123013',
     email: 'christopher.h@example.com',
+    phone: '+237650123013',
     commissions: [],
-    categories: [],
-    
+    categories: [UserCategory.NORMAL],
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.MALE), 
   },
   {
     firstName: 'Jessica',
@@ -286,9 +359,14 @@ const usersData = [
     phoneNumber: '+237650123014',
     whatsappNumber: '+237650123014',
     email: 'jessica.a@example.com',
+    phone: '+237650123014',
     commissions: [Commission.AESTHETICS],
     categories: [UserCategory.COMMITTEE],
-    
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.FEMALE), 
   },
   {
     firstName: 'Matthew',
@@ -306,37 +384,56 @@ const usersData = [
     phoneNumber: '+237650123015',
     whatsappNumber: '+237650123015',
     email: 'matthew.y@example.com',
+    phone: '+237650123015',
     commissions: [],
     categories: [UserCategory.WORSHIPPER],
-    
+    fingerprintData: undefined,
+    voiceCategory: undefined,
+    joinDate: new Date(),
+    isActive: true,
+    profileImageUrl: getProfileImageUrl(Gender.MALE), 
   },
 ];
 
 export const userSeeder = async (dataSource: DataSource) => {
-  const userRepository = dataSource.getRepository(User);
   console.log('Starting to seed users...');
+  const userRepository = dataSource.getRepository(User);
 
   for (const userData of usersData) {
     try {
+      // Check if user already exists
       const existingUser = await userRepository.findOne({
-        where: { phoneNumber: userData.phoneNumber },
+        where: { phoneNumber: userData.phoneNumber }
       });
 
-      if (!existingUser) {
-        console.log(`Creating user: ${userData.firstName} ${userData.lastName}`);
-        const user = userRepository.create(userData);
-        await userRepository.save(user);
-
-        // Set the matricule after saving the user
-        user.matricule = `NJC-${user.id}`;
-        await userRepository.save(user);
-
-        console.log(`Created user: ${userData.firstName} ${userData.lastName} with matricule: ${user.matricule}`);
-      } else {
-        console.log(`User already exists: ${userData.firstName} ${userData.lastName}`);
+      if (existingUser) {
+        console.log(`User ${userData.firstName} ${userData.lastName} already exists, skipping...`);
+        continue;
       }
+
+      console.log(`Creating user: ${userData.firstName} ${userData.lastName}`);
+
+      // Create user with initial data
+      const user = userRepository.create({
+        ...userData,
+        commissions: userData.commissions || [],
+        categories: userData.categories || [UserCategory.NORMAL],
+        isActive: true,
+        joinDate: new Date()
+      });
+
+      // Save user to get the ID
+      const savedUser = await userRepository.save(user);
+
+      // Update matricule after saving
+      await userRepository.update(savedUser.id, {
+        matricule: `NJC-${savedUser.id}`
+      });
+
+      console.log(`Successfully created user: ${userData.firstName} ${userData.lastName}`);
     } catch (error) {
       console.error(`Error creating user ${userData.firstName} ${userData.lastName}:`, error);
+      throw error; // Re-throw to stop the seeding process
     }
   }
 

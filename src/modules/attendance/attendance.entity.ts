@@ -1,11 +1,25 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
 import { User } from '../users/user.entity';
-import { Event } from '../events/event.entity';
 
 export enum AttendanceStatus {
-    PRESENT = 'present',
-    ABSENT = 'absent',
-    LATE = 'late'
+    PRESENT = 'PRESENT',
+    ABSENT = 'ABSENT',
+    LATE = 'LATE',
+    EXCUSED = 'EXCUSED'
+}
+
+export enum AttendanceType {
+    MANUAL = 'MANUAL',
+    BIOMETRIC = 'BIOMETRIC'
+}
+
+export enum AttendanceEventType {
+    NORMAL = 'NORMAL',          // Regular daily attendance
+    WORSHIPPER = 'WORSHIPPER',  // Worshipper practice/performance
+    COMMITTEE = 'COMMITTEE',    // Administrative meetings
+    MUSIC = 'MUSIC',           // Music practice/performance
+    SUNDAY_SERVICE = 'SUNDAY_SERVICE', // Sunday service
+    SPECIAL = 'SPECIAL'        // Special events
 }
 
 @Entity('attendance')
@@ -13,19 +27,55 @@ export class Attendance {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @ManyToOne(() => User, user => user.attendance)
+    @ManyToOne(() => User, user => user.attendances)
+    @JoinColumn({ name: 'userId' })
     user: User;
 
-    @ManyToOne(() => Event, event => event.attendance)
-    event: Event;
+    @Column()
+    userId: number;
+
+    @Column()
+    eventName: string;
 
     @Column({
-        type: 'enum',
+        type: 'varchar',
+        enum: AttendanceEventType,
+        default: AttendanceEventType.NORMAL
+    })
+    eventType: AttendanceEventType;
+
+    @Column({ type: 'date' })
+    date: Date;
+
+    @Column({ type: 'text' })
+    startTime: string;
+
+    @Column({ type: 'text' })
+    endTime: string;
+
+    @Column({
+        type: 'varchar',
         enum: AttendanceStatus,
-        default: AttendanceStatus.ABSENT
+        default: AttendanceStatus.PRESENT
     })
     status: AttendanceStatus;
 
+    @Column({
+        type: 'varchar',
+        enum: AttendanceType,
+        default: AttendanceType.MANUAL
+    })
+    type: AttendanceType;
+
     @Column({ default: false })
     justified: boolean;
+
+    @Column({ type: 'text', nullable: true })
+    justification?: string;
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
 }

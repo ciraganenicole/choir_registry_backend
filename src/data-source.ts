@@ -1,11 +1,10 @@
 import { DataSource } from 'typeorm';
-import { User } from './modules/users/user.entity';
+import { config } from 'dotenv';
 import { AdminUser } from './modules/admin/admin_users.entity';
 import { Attendance } from './modules/attendance/attendance.entity';
+import { User } from './modules/users/user.entity';
 import { Leave } from './modules/leave/leave.entity';
-import { Event } from './modules/events/event.entity';
 import { Transaction } from './modules/transactions/transaction.entity';
-import { config } from 'dotenv';
 
 config();
 
@@ -18,9 +17,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_DATABASE || 'choir_registry',
   synchronize: false,
   logging: true,
-  entities: [User, AdminUser, Attendance, Event, Leave, Transaction],
+  entities: [User, AdminUser, Attendance, Leave, Transaction],
   migrations: ['src/database/migrations/*.ts'],
   subscribers: [],
 });
-
-

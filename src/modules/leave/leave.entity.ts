@@ -1,6 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { User } from '../users/user.entity';
-import { LeaveType } from '../../common/dtos/leave.dto';
 
 @Entity('leave')
 export class Leave {
@@ -11,21 +10,18 @@ export class Leave {
     user: User;
 
     @Column({ type: 'date' })
-    startDate: string;
+    startDate: Date;
 
-    @Column({ type: 'date', nullable: true })
-    endDate: string;
+    @Column({ type: 'date' })
+    endDate: Date;
 
-    @Column({
-        type: 'enum',
-        enum: LeaveType,
-        default: LeaveType.OTHER
-    })
-    leaveType: LeaveType;
+    @Column({ type: 'text' })
+    reason: string;
 
-    @Column({ default: false })
-    approved: boolean;
 
-    @Column({ default: false })
-    rejected: boolean;
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @UpdateDateColumn()
+    updatedAt: Date;
 } 

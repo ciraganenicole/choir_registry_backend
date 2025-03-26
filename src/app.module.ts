@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './modules/users/users.module';
@@ -7,9 +7,10 @@ import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
-import { EventsModule } from './modules/events/events.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { TransactionModule } from './modules/transactions/transaction.module';
+import { UploadModule } from './modules/upload/upload.module';
+import { initCloudinary } from './config/cloudinary.config';
 
 @Module({
   imports: [
@@ -35,10 +36,14 @@ import { TransactionModule } from './modules/transactions/transaction.module';
     LeaveModule,
     AttendanceModule,
     AuthModule,
-    EventsModule,
-    TransactionModule
+    TransactionModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements OnModuleInit {
+  onModuleInit() {
+    initCloudinary();
+  }
+}

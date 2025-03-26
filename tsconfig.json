@@ -8,7 +8,9 @@
     "esModuleInterop": true,
     "strictPropertyInitialization": false,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "jsx": "react",
+    "skipLibCheck": true
   },
   "include": ["src"],
   "exclude": ["node_modules"]

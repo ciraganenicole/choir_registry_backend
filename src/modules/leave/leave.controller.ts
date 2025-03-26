@@ -12,8 +12,8 @@ import {
     UsePipes 
 } from '@nestjs/common';
 import { API_ROUTES } from '../../common/routes/api.routes';
-import { CreateLeaveDto, UpdateLeaveDto } from '../../common/dtos/leave.dto';
-import { LeaveService } from './leave.service';
+import { CreateLeaveDto } from './dto/create-leave.dto';
+import { LeavesService } from './leave.service';
 import { Leave } from './leave.entity';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 
@@ -21,7 +21,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@ne
 @ApiBearerAuth()
 @Controller()
 export class LeaveController {
-    constructor(private readonly leaveService: LeaveService) {}
+    constructor(private readonly leaveService: LeavesService) {}
 
     @ApiOperation({ summary: 'Get all leave requests' })
     @ApiResponse({ status: 200, description: 'Returns all leave requests' })
@@ -65,31 +65,13 @@ export class LeaveController {
     @UsePipes(new ValidationPipe({ transform: true }))
     async updateLeave(
         @Param('id') id: string,
-        @Body() leaveData: UpdateLeaveDto
+        @Body() leaveData: CreateLeaveDto
     ): Promise<Leave> {
         const leaveId = parseInt(id, 10);
         if (isNaN(leaveId)) {
             throw new BadRequestException('Invalid leave ID');
         }
         return this.leaveService.update(leaveId, leaveData);
-    }
-
-    @Put(API_ROUTES.LEAVE.APPROVE)
-    async approveLeave(@Param('id') id: string): Promise<Leave> {
-        const leaveId = parseInt(id, 10);
-        if (isNaN(leaveId)) {
-            throw new BadRequestException('Invalid leave ID');
-        }
-        return this.leaveService.approve(leaveId);
-    }
-
-    @Put(API_ROUTES.LEAVE.REJECT)
-    async rejectLeave(@Param('id') id: string): Promise<Leave> {
-        const leaveId = parseInt(id, 10);
-        if (isNaN(leaveId)) {
-            throw new BadRequestException('Invalid leave ID');
-        }
-        return this.leaveService.reject(leaveId);
     }
 
     @Delete(API_ROUTES.LEAVE.BY_ID)

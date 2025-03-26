@@ -8,15 +8,15 @@ import {
   ParseIntPipe,
   ValidationPipe,
   UsePipes,
-  UseGuards,
   DefaultValuePipe,
-  Header
+  Header,
+  Delete,
+  Put
 } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
-import { CreateTransactionDto, TransactionFilterDto } from '../../common/dtos/transaction.dto';
-import { PaginationDto } from '../../common/dtos/pagination.dto';
-import { Transaction } from './transaction.entity';
-import { TransactionFilters } from './dto/transaction-filters.dto';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { TransactionFilterDto } from './dto/transaction-filter.dto';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { DailyContributionFilterDto } from './dto/daily-contribution.dto';
 
 @Controller('transactions')
@@ -25,7 +25,7 @@ export class TransactionController {
 
   @Post()
   @UsePipes(new ValidationPipe({ transform: true }))
-  async create(@Body() createTransactionDto: CreateTransactionDto): Promise<Transaction> {
+  async create(@Body() createTransactionDto: CreateTransactionDto) {
     return this.transactionService.create(createTransactionDto);
   }
 
@@ -35,28 +35,61 @@ export class TransactionController {
   }
 
   @Get()
-  async findAll(@Query() query: any) {
-    const { page = 1, limit = 10, ...filters } = query;
-    return this.transactionService.findAll(filters, { page, limit });
+  async findAll(@Query() filterDto: TransactionFilterDto) {
+    return this.transactionService.findAll(filterDto);
   }
 
-  @Get('reports')
-  async generateReport(
-    @Query(new ValidationPipe({ transform: true })) filters: TransactionFilterDto
+  @Get('daily')
+  async getDailyContributions(@Query() filterDto: DailyContributionFilterDto) {
+    return this.transactionService.getDailyContributions(filterDto);
+  }
+
+  @Get('report')
+  async generateReport(@Query() filterDto: TransactionFilterDto) {
+    return this.transactionService.generateReport(filterDto);
+  }
+
+  @Get('history/:userId')
+  async getTransactionHistory(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('startDate') startDate: Date,
+    @Query('endDate') endDate: Date
   ) {
-    return this.transactionService.generateReport(filters);
+    return this.transactionService.getTransactionHistory(userId, startDate, endDate);
+  }
+
+  @Get('stats/detailed')
+  async getTransactionStats(
+    @Query('startDate') startDate: Date,
+    @Query('endDate') endDate: Date,
+    @Query('groupBy') groupBy: 'week' | 'month' | 'year'
+  ) {
+    return this.transactionService.getTransactionStats(startDate, endDate, groupBy);
+  }
+
+  @Get(':id')
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.transactionService.findOne(id);
+  }
+
+  @Put(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateTransactionDto: UpdateTransactionDto
+  ) {
+    return this.transactionService.update(id, updateTransactionDto);
+  }
+
+  @Delete(':id')
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    return this.transactionService.remove(id);
   }
 
   @Get('user/:userId/contributions')
   async getUserContributions(
     @Param('userId', ParseIntPipe) userId: number,
-    @Query(new ValidationPipe({ transform: true })) filters: TransactionFilterDto
+    @Query() filterDto: TransactionFilterDto
   ) {
-    return this.transactionService.getUserContributions(userId, filters);
-  }
-
-  @Get('daily')
-  async getDailyContributions(@Query() filters: DailyContributionFilterDto) {
-    return this.transactionService.getDailyContributions(filters);
+    return this.transactionService.getUserContributions(userId, filterDto);
   }
 } 

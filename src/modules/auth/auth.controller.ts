@@ -3,7 +3,6 @@ import {
     Post, 
     Body, 
     Get,
-    UseGuards,
     ValidationPipe,
     UsePipes 
 } from '@nestjs/common';
@@ -12,7 +11,6 @@ import { API_ROUTES } from '../../common/routes/api.routes';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { JwtAuthGuard } from './jwt-auth.guard';
 
 @ApiTags('Auth')
 @Controller()
@@ -29,7 +27,6 @@ export class AuthController {
     }
 
     @Post(API_ROUTES.AUTH.REFRESH)
-    @UseGuards(JwtAuthGuard)
     async refreshToken(@CurrentUser() user: any) {
         return this.authService.refreshToken(user.id);
     }
@@ -39,7 +36,6 @@ export class AuthController {
     @ApiResponse({ status: 200, description: 'Returns user profile' })
     @ApiResponse({ status: 401, description: 'Unauthorized' })
     @Get(API_ROUTES.AUTH.PROFILE)
-    @UseGuards(JwtAuthGuard)
     getProfile(@CurrentUser() user: any) {
         return user;
     }

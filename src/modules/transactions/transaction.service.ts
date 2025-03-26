@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, FindOptionsWhere } from 'typeorm';
-import { Transaction } from './transaction.entity';
-import { CreateTransactionDto, TransactionFilterDto } from '../../common/dtos/transaction.dto';
-import { TransactionType, isCategoryValidForType } from './transactions-categories.enum';
+import { Repository, Between, FindOptionsWhere, Like } from 'typeorm';
+import { Transaction, Currency } from './transaction.entity';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { TransactionFilterDto } from './dto/transaction-filter.dto';
 import { User } from '../users/user.entity';
-import { Currency } from './transaction.entity';
-import { DailyContributionFilterDto,  } from './dto/daily-contribution.dto';
+import { TransactionType, isCategoryValidForType, SubCategories } from './enums/transactions-categories.enum';
+import { DailyContributionFilterDto } from './dto/daily-contribution.dto';
+import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
 @Injectable()
 export class TransactionService {
@@ -28,68 +30,139 @@ export class TransactionService {
       subcategory: createTransactionDto.subcategory,
       description: createTransactionDto.description,
       transactionDate: createTransactionDto.transactionDate,
+      currency: createTransactionDto.currency || Currency.USD
     });
 
-    // Handle contributor (either internal or external)
-    if (createTransactionDto.contributorId) {
-      const contributor = await this.userRepository.findOne({
-        where: { id: createTransactionDto.contributorId },
-      });
-      if (!contributor) {
-        throw new NotFoundException('Contributor not found');
-      }
-      transaction.contributor = contributor;
-    } else if (
-      createTransactionDto.externalContributorName &&
-      createTransactionDto.externalContributorPhone
-    ) {
+    // Handle external contributor
+    if (createTransactionDto.externalContributorName) {
       transaction.externalContributorName = createTransactionDto.externalContributorName;
       transaction.externalContributorPhone = createTransactionDto.externalContributorPhone;
-    } else if (transaction.type === TransactionType.INCOME) {
-      throw new BadRequestException(
-        'Either contributorId or external contributor details are required for income transactions',
-      );
+      transaction.contributorId = null;
+      transaction.contributor = null;
+    } 
+    // Handle internal contributor
+    else if (createTransactionDto.contributorId) {
+      const user = await this.userRepository.findOne({
+        where: { id: createTransactionDto.contributorId }
+      });
+      if (!user) {
+        throw new NotFoundException(`User with ID ${createTransactionDto.contributorId} not found`);
+      }
+      transaction.contributor = user;
+      transaction.contributorId = user.id;
     }
 
     return this.transactionRepository.save(transaction);
   }
 
-  async findAll(filters: any, pagination: { page: number; limit: number }) {
-    const skip = (pagination.page - 1) * pagination.limit;
-    const query = this.transactionRepository.createQueryBuilder('transaction')
-      .leftJoinAndSelect('transaction.contributor', 'contributor')
-      .select([
-        'transaction.id',
-        'transaction.amount',
-        'transaction.currency',
-        'transaction.type',
-        'transaction.category',
-        'transaction.transactionDate',
-        'contributor.id',
-        'contributor.firstName',
-        'contributor.lastName'
-      ])
-      .skip(skip)
-      .take(pagination.limit)
-      .orderBy('transaction.transactionDate', 'DESC');
+  async findAll(filterDto: TransactionFilterDto): Promise<{ data: Transaction[]; total: number }> {
+    const { startDate, endDate, type, category, subcategory, contributorId, currency, search, page = 1, limit = 10 } = filterDto;
+    const skip = (page - 1) * limit;
 
-    if (filters.type) {
-      query.andWhere('transaction.type = :type', { type: filters.type });
-    }
+    const queryBuilder = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.contributor', 'contributor');
 
-    if (filters.category) {
-      query.andWhere('transaction.category = :category', { category: filters.category });
-    }
-
-    if (filters.startDate && filters.endDate) {
-      query.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-        startDate: filters.startDate,
-        endDate: filters.endDate,
+    if (startDate && endDate) {
+      queryBuilder.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
       });
     }
 
-    const [data, total] = await query.getManyAndCount();
-    return { data, total, page: pagination.page, limit: pagination.limit };
+    if (type) {
+      queryBuilder.andWhere('transaction.type = :type', { type });
+    }
+
+    if (category) {
+      if (type && !isCategoryValidForType(category, type)) {
+        throw new BadRequestException('Invalid category for the specified transaction type');
+      }
+      queryBuilder.andWhere('transaction.category = :category', { category });
+    }
+
+    if (subcategory) {
+      queryBuilder.andWhere('transaction.subcategory = :subcategory', { subcategory });
+    }
+
+    if (contributorId) {
+      queryBuilder.andWhere('transaction.contributorId = :contributorId', { contributorId });
+    }
+
+    if (currency) {
+      queryBuilder.andWhere('transaction.currency = :currency', { currency });
+    }
+
+    if (search) {
+      queryBuilder.andWhere(
+        '(LOWER(contributor.firstName) LIKE LOWER(:search) OR LOWER(contributor.lastName) LIKE LOWER(:search) OR LOWER(transaction.externalContributorName) LIKE LOWER(:search))',
+        { search: `%${search}%` }
+      );
+    }
+
+    queryBuilder
+      .orderBy('transaction.transactionDate', 'DESC')
+      .addOrderBy('transaction.createdAt', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [transactions, total] = await queryBuilder.getManyAndCount();
+
+    // Ensure amounts are numbers without changing the entity structure
+    transactions.forEach(transaction => {
+      transaction.amount = Number(transaction.amount) || 0;
+      if (!(transaction.transactionDate instanceof Date)) {
+        transaction.transactionDate = new Date(transaction.transactionDate);
+      }
+    });
+
+    return {
+      data: transactions,
+      total
+    };
+  }
+
+  async findOne(id: number): Promise<Transaction> {
+    const transaction = await this.transactionRepository.findOne({
+      where: { id },
+      relations: ['contributor']
+    });
+
+    if (!transaction) {
+      throw new NotFoundException(`Transaction with ID ${id} not found`);
+    }
+
+    return transaction;
+  }
+
+  async update(id: number, updateTransactionDto: UpdateTransactionDto): Promise<Transaction> {
+    const transaction = await this.findOne(id);
+    const { externalContributorName, contributorId, ...rest } = updateTransactionDto as CreateTransactionDto;
+
+    // Handle contributor updates
+    if (externalContributorName) {
+      transaction.contributorId = null;
+      transaction.contributor = null;
+    } else if (contributorId) {
+      const user = await this.userRepository.findOne({
+        where: { id: contributorId }
+      });
+      if (!user) {
+        throw new NotFoundException(`User with ID ${contributorId} not found`);
+      }
+      transaction.contributor = user;
+      transaction.contributorId = user.id;
+    }
+
+    Object.assign(transaction, rest);
+    return this.transactionRepository.save(transaction);
+  }
+
+  async remove(id: number): Promise<void> {
+    const result = await this.transactionRepository.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Transaction with ID ${id} not found`);
+    }
   }
 
   async generateReport(filters: TransactionFilterDto): Promise<any> {
@@ -184,116 +257,274 @@ export class TransactionService {
 
   async getStats() {
     const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const currentMonthStart = startOfMonth(today);
+    const currentMonthEnd = endOfMonth(today);
+    const lastMonthStart = startOfMonth(subMonths(today, 1));
+    const lastMonthEnd = endOfMonth(subMonths(today, 1));
 
     const [currentMonthTransactions, lastMonthTransactions] = await Promise.all([
       this.transactionRepository.find({
         where: {
-          transactionDate: Between(
-            firstDayOfMonth.toISOString().split('T')[0],
-            lastDayOfMonth.toISOString().split('T')[0]
-          )
-        },
-        select: ['amount', 'type', 'currency', 'category']
+          transactionDate: Between(currentMonthStart, currentMonthEnd)
+        }
       }),
       this.transactionRepository.find({
         where: {
-          transactionDate: Between(
-            firstDayOfLastMonth.toISOString().split('T')[0],
-            firstDayOfMonth.toISOString().split('T')[0]
-          )
-        },
-        select: ['amount', 'type', 'currency']
+          transactionDate: Between(lastMonthStart, lastMonthEnd)
+        }
       })
     ]);
 
-    return {
-      currentMonth: currentMonthTransactions,
-      lastMonth: lastMonthTransactions
+    // Ensure amounts are numbers
+    const processTransactions = (transactions: Transaction[]) => {
+      return transactions.map(transaction => ({
+        ...transaction,
+        amount: Number(transaction.amount) || 0
+      }));
     };
+
+    return {
+      currentMonth: processTransactions(currentMonthTransactions),
+      lastMonth: processTransactions(lastMonthTransactions)
+    };
+  }
+
+  private calculateTotal(transactions: Transaction[], type: TransactionType, currency: Currency): number {
+    return transactions
+      .filter(t => t.type === type && t.currency === currency)
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+  }
+
+  private calculateDailyTotal(transactions: Transaction[], currency: Currency): number {
+    return transactions
+      .filter(t => 
+        t.type === TransactionType.INCOME && 
+        t.currency === currency && 
+        t.category === 'DAILY'
+      )
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+  }
+
+  private calculatePercentageChange(current: number, previous: number): number {
+    if (!previous) return 0;
+    return ((current - previous) / Math.abs(previous)) * 100;
   }
 
   async getDailyContributions(filters: DailyContributionFilterDto) {
-    const query = this.transactionRepository
-      .createQueryBuilder('transaction')
-      .leftJoinAndSelect('transaction.contributor', 'contributor')
-      .where('transaction.category = :category', { category: 'DAILY' })
-      .andWhere('transaction.type = :type', { type: TransactionType.INCOME });
+    try {
+      const { startDate, endDate, contributorId, search, page = 1, limit = 10 } = filters;
+      const skip = (page - 1) * limit;
 
-    if (filters.startDate && filters.endDate) {
-      query.andWhere('transaction.transactionDate BETWEEN :start AND :end', {
-        start: filters.startDate,
-        end: filters.endDate,
-      });
-    }
+      const query = this.transactionRepository
+        .createQueryBuilder('transaction')
+        .leftJoinAndSelect('transaction.contributor', 'contributor')
+        .where('transaction.category = :category', { category: 'DAILY' })
+        .andWhere('transaction.type = :type', { type: TransactionType.INCOME });
 
-    if (filters.contributorId) {
-      query.andWhere('contributor.id = :contributorId', {
-        contributorId: filters.contributorId,
-      });
-    }
+      if (startDate && endDate) {
+        // Ensure we have proper Date objects
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          throw new BadRequestException('Invalid date format. Please use YYYY-MM-DD format.');
+        }
 
-    if (filters.search) {
-      query.andWhere(
-        '(LOWER(contributor.firstName) LIKE LOWER(:search) OR LOWER(contributor.lastName) LIKE LOWER(:search))',
-        { search: `%${filters.search}%` }
-      );
-    }
-
-    const transactions = await query
-      .select([
-        'contributor.id',
-        'contributor.firstName',
-        'contributor.lastName',
-        'transaction.amount',
-        'transaction.currency',
-        'transaction.transactionDate',
-      ])
-      .orderBy('transaction.transactionDate', 'ASC')
-      .getMany();
-
-    // Get unique dates
-    const dates = [...new Set(transactions.map(t => t.transactionDate))].sort();
-
-    // Group by contributor
-    const contributorsMap = new Map();
-
-    transactions.forEach(transaction => {
-      const contributorId = transaction.contributor?.id;
-      if (!contributorId) return;
-
-      if (!contributorsMap.has(contributorId)) {
-        contributorsMap.set(contributorId, {
-          userId: contributorId,
-          firstName: transaction.contributor?.firstName || '',
-          lastName: transaction.contributor?.lastName || '',
-          totalAmount: 0,
-          contributions: [],
+        query.andWhere('transaction.transactionDate BETWEEN :start AND :end', {
+          start,
+          end,
         });
       }
 
-      const contributor = contributorsMap.get(contributorId);
-      contributor.totalAmount += transaction.amount;
-      contributor.contributions.push({
-        date: transaction.transactionDate,
-        amount: transaction.amount,
-        currency: transaction.currency,
+      if (contributorId) {
+        query.andWhere('contributor.id = :contributorId', {
+          contributorId,
+        });
+      }
+
+      if (search) {
+        query.andWhere(
+          '(LOWER(contributor.firstName) LIKE LOWER(:search) OR LOWER(contributor.lastName) LIKE LOWER(:search))',
+          { search: `%${search}%` }
+        );
+      }
+
+      // If limit is very large (e.g., 999999), we're exporting all records
+      if (limit < 999999) {
+        query.skip(skip).take(limit);
+      }
+
+      const transactions = await query
+        .orderBy('transaction.transactionDate', 'ASC')
+        .getMany();
+
+      // Get unique dates
+      const dates = [...new Set(transactions.map(t => {
+        const date = new Date(t.transactionDate);
+        return date.toISOString().split('T')[0];
+      }))].sort();
+
+      // Group by contributor
+      const contributorsMap = new Map();
+
+      transactions.forEach(transaction => {
+        if (!transaction.contributor) return;
+
+        const contributorId = transaction.contributor.id;
+        if (!contributorsMap.has(contributorId)) {
+          contributorsMap.set(contributorId, {
+            userId: contributorId,
+            firstName: transaction.contributor.firstName || '',
+            lastName: transaction.contributor.lastName || '',
+            totalAmount: 0,
+            contributions: [],
+          });
+        }
+
+        const contributor = contributorsMap.get(contributorId);
+        const amount = Number(transaction.amount) || 0;
+        contributor.totalAmount += amount;
+        contributor.contributions.push({
+          date: new Date(transaction.transactionDate).toISOString().split('T')[0],
+          amount: amount,
+          currency: transaction.currency
+        });
+      });
+
+      // Sort contributors by name
+      const contributors = Array.from(contributorsMap.values())
+        .sort((a, b) => (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName));
+
+      return {
+        dates,
+        contributors,
+        total: transactions.length
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      console.error('Error in getDailyContributions:', error);
+      throw new BadRequestException('Failed to fetch daily contributions. Please check your input parameters.');
+    }
+  }
+
+  private getPeriods(startDate: Date, endDate: Date, groupBy: 'week' | 'month' | 'year'): string[] {
+    const periods: string[] = [];
+    let currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+      periods.push(this.getPeriodKey(currentDate, groupBy));
+      currentDate = this.addPeriod(currentDate, groupBy);
+    }
+
+    return periods;
+  }
+
+  private getPeriodKey(date: Date, groupBy: 'week' | 'month' | 'year'): string {
+    switch (groupBy) {
+      case 'week':
+        return format(date, 'yyyy-Www');
+      case 'month':
+        return format(date, 'yyyy-MM');
+      case 'year':
+        return format(date, 'yyyy');
+      default:
+        return format(date, 'yyyy-MM');
+    }
+  }
+
+  private addPeriod(date: Date, groupBy: 'week' | 'month' | 'year'): Date {
+    const newDate = new Date(date);
+    switch (groupBy) {
+      case 'week':
+        newDate.setDate(newDate.getDate() + 7);
+        break;
+      case 'month':
+        newDate.setMonth(newDate.getMonth() + 1);
+        break;
+      case 'year':
+        newDate.setFullYear(newDate.getFullYear() + 1);
+        break;
+    }
+    return newDate;
+  }
+
+  async getTransactionStats(startDate: Date, endDate: Date, groupBy: 'week' | 'month' | 'year' = 'month') {
+    const periods = this.getPeriods(startDate, endDate, groupBy);
+    const stats = new Map<string, {
+      period: string;
+      totalIncome: number;
+      totalExpense: number;
+      transactions: any[];
+    }>();
+
+    // Initialize periods
+    periods.forEach(period => {
+      stats.set(period, {
+        period,
+        totalIncome: 0,
+        totalExpense: 0,
+        transactions: []
       });
     });
 
-    return {
-      dates,
-      contributors: Array.from(contributorsMap.values()),
-      total: transactions.length
-    };
+    const transactions = await this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.contributor', 'contributor')
+      .where('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate
+      })
+      .orderBy('transaction.transactionDate', 'ASC')
+      .getMany();
+
+    transactions.forEach(transaction => {
+      const periodKey = this.getPeriodKey(transaction.transactionDate, groupBy);
+      const periodStats = stats.get(periodKey)!;
+
+      if (transaction.type === TransactionType.INCOME) {
+        periodStats.totalIncome += transaction.amount;
+      } else {
+        periodStats.totalExpense += transaction.amount;
+      }
+
+      periodStats.transactions.push({
+        id: transaction.id,
+        amount: transaction.amount,
+        type: transaction.type,
+        category: transaction.category,
+        date: transaction.transactionDate,
+        contributor: transaction.contributorId ? {
+          id: transaction.contributorId,
+          name: `${transaction.externalContributorName}`
+        } : null,
+        description: transaction.description
+      });
+    });
+
+    return Array.from(stats.values());
   }
 
-  private calculateMonthsBetweenDates(startDate: Date, endDate: Date): number {
-    return (
-      (endDate.getFullYear() - startDate.getFullYear()) * 12 +
-      endDate.getMonth() - startDate.getMonth()
-    );
+  async getTransactionHistory(userId: number, startDate: Date, endDate: Date) {
+    const transactions = await this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.contributor', 'contributor')
+      .where('transaction.contributorId = :userId', { userId })
+      .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate
+      })
+      .orderBy('transaction.transactionDate', 'DESC')
+      .getMany();
+
+    return transactions.map(transaction => ({
+      id: transaction.id,
+      amount: transaction.amount,
+      type: transaction.type,
+      category: transaction.category,
+      date: transaction.transactionDate,
+      description: transaction.description
+    }));
   }
 } 

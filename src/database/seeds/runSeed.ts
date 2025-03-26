@@ -2,6 +2,8 @@ import { AppDataSource } from '../../data-source';
 import { adminSeeder } from './admin.seed';
 import { userSeeder } from './user.seed';
 import { TransactionSeeder } from './transaction.seed';
+import { seedLeaves } from './leaves.seed';
+import { seedAttendance } from './attendance.seed';
 
 const runSeed = async () => {
   try {
@@ -16,9 +18,12 @@ const runSeed = async () => {
 
     // Run seeds
     console.log('🌱 Starting seeding...');
-    await adminSeeder(AppDataSource);
-    await userSeeder(AppDataSource);
-    await new TransactionSeeder().run(AppDataSource);
+    // await adminSeeder(AppDataSource);
+    // await userSeeder(AppDataSource);
+    // await new TransactionSeeder().run(AppDataSource);
+    // await seedEvents(AppDataSource);
+    await seedLeaves(AppDataSource);
+    await seedAttendance(AppDataSource);
     console.log('🎉 Seeding completed successfully!');
 
   } catch (error) {

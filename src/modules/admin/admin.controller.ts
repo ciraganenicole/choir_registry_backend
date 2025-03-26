@@ -6,13 +6,11 @@ import {
     Delete,
     Body, 
     Param,
-    UseGuards,
     ValidationPipe,
     UsePipes,
     BadRequestException 
 } from '@nestjs/common';
 import { AdminUsersService } from './admin_users.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminRole } from './admin-role.enum';
 import { CreateAdminDto, UpdateAdminDto } from '../../common/dtos/admin.dto';
 import { API_ROUTES } from '../../common/routes/api.routes';
@@ -20,7 +18,6 @@ import { AdminUser } from './admin_users.entity';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard)
 export class AdminController {
     constructor(private readonly adminService: AdminUsersService) {}
 

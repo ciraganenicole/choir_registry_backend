@@ -4,6 +4,8 @@ export const API_ROUTES = {
         BY_ID: 'users/:id',
         BY_CATEGORY: 'users/category/:category',
         FINGERPRINT: 'users/:id/fingerprint',
+        UPLOAD_PICTURE: '/users/:id/upload-picture',
+        TRANSACTIONS: '/users/:id/transactions',
     },
     ATTENDANCE: {
         BASE: 'attendance',

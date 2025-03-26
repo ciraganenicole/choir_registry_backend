@@ -13,12 +13,23 @@ export class DailyContributionFilterDto {
   endDate?: Date;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   contributorId?: number;
 
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  limit?: number = 10;
 
   @IsOptional()
   @IsString()

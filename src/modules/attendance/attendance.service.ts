@@ -1,311 +1,388 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CreateAttendanceDto } from '../../common/dtos/attendance.dto';
-import { Attendance, AttendanceStatus } from './attendance.entity';
-import { UsersService } from '../users';
-import { Event } from '../events/event.entity';
-import { PaginationOptions, PaginatedResponse } from '../../common/interfaces/pagination.interface';
-import { 
-  startOfWeek, 
-  endOfWeek, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfYear, 
-  endOfYear, 
-  subMonths,
-  subYears 
-} from 'date-fns';
-import { UserCategory } from '../users/enums/user-category.enum';
-import { EventsService } from '../events/events.service';
+import { Repository, Between, Like } from 'typeorm';
+import { CreateAttendanceDto } from './dto/create-attendance.dto';
+import { Attendance, AttendanceStatus, AttendanceType, AttendanceEventType } from './attendance.entity';
+import { UsersService } from '../users/users.service';
+import { LeavesService } from '../leave/leave.service';
+import { format } from 'date-fns';
+import { UpdateAttendanceDto } from './dto/update-attendance.dto';
+import { User } from '../users/user.entity';
+import { AttendanceFilterDto } from './dto/attendance-filter.dto';
+import { Leave } from '../leave/leave.entity';
+
+interface AttendancePaginationOptions {
+  page?: number;
+  limit?: number;
+  eventType?: AttendanceEventType;
+  status?: AttendanceStatus;
+  startDate?: Date;
+  endDate?: Date;
+  userId?: number;
+  search?: string;
+}
+
+interface AttendanceStats {
+    total: number;
+    present: number;
+    absent: number;
+    late: number;
+    excused: number;
+    presentPercentage: number;
+}
+
+interface AttendanceStatsDetail {
+    total: number;
+    present: number;
+    absent: number;
+    late: number;
+    excused: number;
+}
+
+interface GroupedAttendanceStats {
+    overall: AttendanceStatsDetail;
+    byDate: Record<string, AttendanceStatsDetail>;
+    byEventType: Record<string, AttendanceStatsDetail>;
+}
+
+interface QueryParams {
+    startDate?: Date;
+    endDate?: Date;
+    userId?: number;
+    eventType?: string;
+    status?: string;
+}
 
 @Injectable()
 export class AttendanceService {
-  userRepository: any;
-  
   constructor(
     @InjectRepository(Attendance)
     private readonly attendanceRepository: Repository<Attendance>,
-    @InjectRepository(Event)
-    private readonly eventRepository: Repository<Event>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
     private readonly usersService: UsersService,
-    private readonly eventsService: EventsService, // Injecting the EventsService
+    private readonly leavesService: LeavesService,
+    @InjectRepository(Leave)
+    private readonly leaveRepository: Repository<Leave>
   ) {}
 
-  // Mark attendance for a user based on event category
-  async markAttendance(eventId: number, userId: number): Promise<Attendance> {
-    const event = await this.eventRepository.findOne({ where: { id: eventId } });
-    if (!event) {
-      throw new NotFoundException(`Event with ID ${eventId} not found`);
+  async create(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
+    const { date, startTime, endTime, ...rest } = createAttendanceDto;
+
+    // Format the date
+    const formattedDate = new Date(date);
+    formattedDate.setHours(0, 0, 0, 0);
+
+    // Check if user is on leave
+    const leaveRecord = await this.checkUserLeave(
+      createAttendanceDto.userId,
+      formattedDate
+    );
+
+    // Create the attendance record with formatted values
+    const attendance = this.attendanceRepository.create({
+      ...rest,
+      date: formattedDate,
+      startTime: startTime.substring(0, 5), // Ensure HH:MM format
+      endTime: endTime.substring(0, 5), // Ensure HH:MM format
+    });
+
+    if (leaveRecord) {
+      attendance.status = AttendanceStatus.ABSENT;
+      attendance.justified = true;
+      attendance.justification = `On leave: ${leaveRecord.reason}`;
     }
-
-    // Check if the user is allowed to access the event based on category
-    const user = await this.usersService.getOneUser(userId);
-    const userCategories = user.categories;  // Assuming the User has a categories field
-    const allowedCategories = [UserCategory.WORSHIPPER, UserCategory.COMMITTEE];
-
-    if (!userCategories.some(category => allowedCategories.includes(category))) {
-      throw new ForbiddenException('Access denied: You are not authorized to attend this event.');
-    }
-
-    // Before checking event categories, convert string to enum
-    if (!event.category || ![UserCategory.WORSHIPPER, UserCategory.COMMITTEE].includes(event.category as UserCategory)) {
-      throw new ForbiddenException('This event is restricted to specific categories.');
-    }
-
-    const attendance = new Attendance();
-    attendance.event = event;
-    attendance.user = user;
 
     return this.attendanceRepository.save(attendance);
   }
 
-  // Get attendance by event ID
-  async getAttendanceByEvent(eventId: number): Promise<Attendance[]> {
-    const event = await this.eventRepository.findOne({ where: { id: eventId } });
-    if (!event) {
-      throw new NotFoundException(`Event with ID ${eventId} not found`);
-    }
+  async findAll(filterDto: AttendanceFilterDto): Promise<[Attendance[], number]> {
+    const { startDate, endDate, userId, eventType, status, search, page = 1, limit = 10, sortBy = 'date', sortOrder = 'DESC' } = filterDto;
+    const skip = (page - 1) * limit;
 
-    return this.attendanceRepository.find({ where: { event }, relations: ['user'] });
-  }
-
-  // Get attendance for a specific user
-  async getUserAttendance(userId: number): Promise<Attendance[]> {
-    const user = await this.usersService.getOneUser(userId);
-    if (!user) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
-    }
-
-    return this.attendanceRepository.find({ where: { user }, relations: ['event'] });
-  }
-
-  // Get attendance summary for a specific event
-  async getAttendanceSummary(eventId: number): Promise<{ event: Event; total: number }> {
-    const event = await this.eventRepository.findOne({ where: { id: eventId } });
-    if (!event) {
-      throw new NotFoundException(`Event with ID ${eventId} not found`);
-    }
-
-    const total = await this.attendanceRepository.count({ where: { event } });
-
-    return { event, total };
-  }
-
-  // Find all attendance records with pagination
-  async findAll(options: PaginationOptions = {}): Promise<PaginatedResponse<Attendance>> {
-    const { page = 1, limit = 10, search, sortBy = 'date', sortOrder = 'DESC' } = options;
-    
     const queryBuilder = this.attendanceRepository
       .createQueryBuilder('attendance')
-      .leftJoinAndSelect('attendance.user', 'user')
-      .leftJoinAndSelect('attendance.event', 'event');
+      .leftJoinAndSelect('attendance.user', 'user');
 
     if (search) {
       queryBuilder.andWhere(
-        '(user.name ILIKE :search OR user.surname ILIKE :search OR event.name ILIKE :search)',
+        '(LOWER(attendance.eventName) LIKE LOWER(:search) OR LOWER(user.firstName) LIKE LOWER(:search) OR LOWER(user.lastName) LIKE LOWER(:search))',
         { search: `%${search}%` }
       );
     }
 
-    const total = await queryBuilder.getCount();
-    
-    const items = await queryBuilder
-      .orderBy(`attendance.${sortBy}`, sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getMany();
+    if (startDate && endDate) {
+      queryBuilder.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate,
+      });
+    }
 
-    return {
-      items,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
-    };
+    if (userId) {
+      queryBuilder.andWhere('attendance.userId = :userId', { userId });
+    }
+
+    if (eventType) {
+      queryBuilder.andWhere('attendance.eventType = :eventType', { eventType });
+    }
+
+    if (status) {
+      queryBuilder.andWhere('attendance.status = :status', { status });
+    }
+
+    // Add sorting
+    if (sortBy) {
+      const order = sortOrder === 'ASC' ? 'ASC' : 'DESC';
+      queryBuilder.orderBy(`attendance.${sortBy}`, order);
+    }
+
+    queryBuilder.skip(skip).take(limit);
+
+    return queryBuilder.getManyAndCount();
   }
 
-  // Find one attendance by ID
+  async findByUser(userId: number, filterDto: AttendanceFilterDto): Promise<[Attendance[], number]> {
+    return this.findAll({ ...filterDto, userId });
+  }
+
   async findOne(id: number): Promise<Attendance> {
     const attendance = await this.attendanceRepository.findOne({
       where: { id },
-      relations: ['user']
+      relations: ['user'],
     });
+
     if (!attendance) {
       throw new NotFoundException(`Attendance with ID ${id} not found`);
     }
+
     return attendance;
   }
 
-  // Find attendance by user with pagination
-  async findByUser(
-    userId: number, 
-    options: PaginationOptions = {}
-  ): Promise<PaginatedResponse<Attendance>> {
-    const { page = 1, limit = 10, sortBy = 'date', sortOrder = 'DESC' } = options;
-    
-    const queryBuilder = this.attendanceRepository
+  async findAttendanceByUserAndDate(userId: number, date: Date): Promise<Attendance | null> {
+    return this.attendanceRepository
       .createQueryBuilder('attendance')
-      .leftJoinAndSelect('attendance.event', 'event')
-      .where('attendance.user.id = :userId', { userId });
-
-    const total = await queryBuilder.getCount();
-    
-    const items = await queryBuilder
-      .orderBy(`attendance.${sortBy}`, sortOrder)
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getMany();
-
-    return {
-      items,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
-    };
+      .leftJoinAndSelect('attendance.user', 'user')
+      .where('attendance.userId = :userId', { userId })
+      .andWhere('attendance.date = :date', { 
+        date: date.toISOString().split('T')[0]
+      })
+      .getOne();
   }
 
-  // Find attendance by event
-  async findByEvent(eventId: number): Promise<Attendance[]> {
-    const event = await this.eventRepository.findOne({ where: { id: eventId } });
-    if (!event) {
-      throw new NotFoundException(`Event with ID ${eventId} not found`);
+  async getUserAttendance(userId: number, startDate?: Date, endDate?: Date): Promise<Attendance[]> {
+    const query = this.attendanceRepository.createQueryBuilder('attendance')
+      .leftJoinAndSelect('attendance.user', 'user')
+      .where('attendance.userId = :userId', { userId });
+
+    if (startDate && endDate) {
+      query.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
+        startDate,
+        endDate
+      });
     }
+
+    return query.orderBy('attendance.date', 'DESC')
+      .addOrderBy('attendance.startTime', 'DESC')
+      .getMany();
+  }
+
+  async update(id: number, updateAttendanceDto: UpdateAttendanceDto): Promise<Attendance> {
+    const attendance = await this.findOne(id);
+    const { date, startTime, endTime, ...rest } = updateAttendanceDto;
     
-    return this.attendanceRepository.find({
-      where: { event: { id: eventId } },
-      relations: ['user', 'event']
+    let formattedDate = attendance.date;
+    if (date) {
+      formattedDate = new Date(date);
+      formattedDate.setHours(0, 0, 0, 0);
+      
+      // Check if user is on leave for the new date
+      const leaveRecord = await this.checkUserLeave(
+        attendance.userId,
+        formattedDate
+      );
+
+      if (leaveRecord) {
+        rest.status = AttendanceStatus.ABSENT;
+        rest.justified = true;
+        rest.justification = `On leave: ${leaveRecord.reason}`;
+      }
+    }
+
+    if (rest.userId) {
+      const user = await this.userRepository.findOne({ where: { id: rest.userId } });
+      if (!user) {
+        throw new NotFoundException(`User with ID ${rest.userId} not found`);
+      }
+      attendance.user = user;
+    }
+
+    // Update with formatted values
+    Object.assign(attendance, {
+      ...rest,
+      date: formattedDate,
+      ...(startTime && { startTime: startTime.substring(0, 5) }), // Ensure HH:MM format if provided
+      ...(endTime && { endTime: endTime.substring(0, 5) }), // Ensure HH:MM format if provided
+    });
+
+    return this.attendanceRepository.save(attendance);
+  }
+
+  async remove(id: number): Promise<void> {
+    const result = await this.attendanceRepository.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Attendance with ID ${id} not found`);
+    }
+  }
+
+  async markManualAttendance(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
+    return this.create({
+      ...createAttendanceDto,
+      type: AttendanceType.MANUAL,
     });
   }
 
-  // Justify an absence for a specific attendance record
   async justifyAbsence(id: number, justified: boolean): Promise<Attendance> {
     const attendance = await this.findOne(id);
     attendance.justified = justified;
     return this.attendanceRepository.save(attendance);
   }
 
-  // Determine attendance status based on event start time
-  private determineAttendanceStatus(event: Event): AttendanceStatus {
-    const now = new Date();
-    const currentTime = now.getHours() * 60 + now.getMinutes(); // Convert to minutes
+  async getUserAttendanceStats(userId: number, startDate: Date, endDate: Date): Promise<AttendanceStats> {
+    const attendances = await this.attendanceRepository
+      .createQueryBuilder('attendance')
+      .where('attendance.userId = :userId', { userId })
+      .andWhere('attendance.date BETWEEN :startDate AND :endDate', {
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      })
+      .getMany();
 
-    const [eventStartHour, eventStartMinute] = event.startTime.split(':').map(Number);
-    const eventStartInMinutes = eventStartHour * 60 + eventStartMinute;
+    const total = attendances.length;
+    const present = attendances.filter(a => a.status === AttendanceStatus.PRESENT).length;
+    const absent = attendances.filter(a => a.status === AttendanceStatus.ABSENT).length;
+    const late = attendances.filter(a => a.status === AttendanceStatus.LATE).length;
+    const excused = attendances.filter(a => a.status === AttendanceStatus.EXCUSED).length;
 
-    // Define a grace period (e.g., 15 minutes)
-    const gracePeriod = 15;
-
-    if (currentTime <= eventStartInMinutes + gracePeriod) {
-      return AttendanceStatus.PRESENT;
-    } else {
-      return AttendanceStatus.LATE;
-    }
+    return {
+      total,
+      present,
+      absent,
+      late,
+      excused,
+      presentPercentage: total > 0 ? (present / total) * 100 : 0,
+    };
   }
 
-  // Get attendance statistics for a specific date range
-  async getAttendanceStats(
-    startDate?: Date,
-    endDate?: Date,
-    groupBy: 'week' | 'month' | 'year' = 'month',
-    preset?: 'current_week' | 'current_month' | 'current_year' | 'last_3_months' | 'last_year'
-  ) {
-    try {
-      const now = new Date();
+  async getAttendanceStats(startDate: Date, endDate: Date): Promise<GroupedAttendanceStats> {
+    const results = await this.attendanceRepository
+      .createQueryBuilder('attendance')
+      .select([
+        'attendance.date',
+        'attendance.eventType',
+        'attendance.status',
+        'COUNT(*) as count'
+      ])
+      .where('attendance.date BETWEEN :startDate AND :endDate', { 
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      })
+      .groupBy('attendance.date')
+      .addGroupBy('attendance.eventType')
+      .addGroupBy('attendance.status')
+      .getRawMany();
 
-      // If no dates provided and no preset, default to current month
-      if (!startDate && !endDate && !preset) {
-        startDate = startOfMonth(now);
-        endDate = endOfMonth(now);
-      }
-      
-      // Handle preset ranges
-      if (preset) {
-        switch (preset) {
-          case 'current_week':
-            startDate = startOfWeek(now);
-            endDate = endOfWeek(now);
-            break;
-          case 'current_month':
-            startDate = startOfMonth(now);
-            endDate = endOfMonth(now);
-            break;
-          case 'current_year':
-            startDate = startOfYear(now);
-            endDate = endOfYear(now);
-            break;
-          case 'last_3_months':
-            startDate = startOfMonth(subMonths(now, 3));
-            endDate = endOfMonth(now);
-            break;
-          case 'last_year':
-            startDate = startOfYear(subYears(now, 1));
-            endDate = endOfYear(subYears(now, 1));
-            break;
-        }
-      }
+    const stats: GroupedAttendanceStats = {
+      overall: {
+        total: 0,
+        present: 0,
+        absent: 0,
+        late: 0,
+        excused: 0
+      },
+      byDate: {},
+      byEventType: {}
+    };
 
-      const query = this.attendanceRepository
-        .createQueryBuilder('attendance')
-        .where('attendance.date BETWEEN :startDate AND :endDate', {
-          startDate,
-          endDate,
-        });
+    for (const result of results) {
+      const count = parseInt(result.count);
+      stats.overall.total += count;
 
-      // Add status to the query
-      query.andWhere('attendance.status = :status', { 
-        status: 'PRESENT' 
-      });
+      const dateStr = new Date(result.attendance_date).toISOString().split('T')[0];
 
-      switch (groupBy) {
-        case 'week':
-          query
-            .select([ 
-              "DATE_TRUNC('week', attendance.date) AS period", 
-              'COUNT(DISTINCT attendance.userId) AS total_attendees',
-              'COUNT(*) AS total_attendances' 
-            ])
-            .groupBy('period')
-            .orderBy('period', 'ASC');
-          break;
-
-        case 'month':
-          query
-            .select([ 
-              "DATE_TRUNC('month', attendance.date) AS period", 
-              'COUNT(DISTINCT attendance.userId) AS total_attendees',
-              'COUNT(*) AS total_attendances' 
-            ])
-            .groupBy('period')
-            .orderBy('period', 'ASC');
-          break;
-
-        case 'year':
-          query
-            .select([ 
-              "DATE_TRUNC('year', attendance.date) AS period", 
-              'COUNT(DISTINCT attendance.userId) AS total_attendees',
-              'COUNT(*) AS total_attendances' 
-            ])
-            .groupBy('period')
-            .orderBy('period', 'ASC');
-          break;
+      // Initialize date stats if not exists
+      if (!stats.byDate[dateStr]) {
+        stats.byDate[dateStr] = {
+          total: 0,
+          present: 0,
+          absent: 0,
+          late: 0,
+          excused: 0
+        };
       }
 
-      const stats = await query.getRawMany();
+      // Initialize event type stats if not exists
+      if (!stats.byEventType[result.attendance_eventtype]) {
+        stats.byEventType[result.attendance_eventtype] = {
+          total: 0,
+          present: 0,
+          absent: 0,
+          late: 0,
+          excused: 0
+        };
+      }
 
-      return stats.map(stat => ({
-        period: stat.period,
-        totalAttendees: parseInt(stat.total_attendees) || 0,
-        totalAttendances: parseInt(stat.total_attendances) || 0,
-        averageAttendancePerPerson: stat.total_attendees > 0 
-          ? parseFloat((stat.total_attendances / stat.total_attendees).toFixed(2))
-          : 0
-      }));
-    } catch (error) {
-      console.error('Database error:', error);
-      throw new BadRequestException('Failed to get attendance stats');
+      const status = result.attendance_status.toLowerCase() as keyof AttendanceStatsDetail;
+      stats.overall[status] += count;
+      stats.byDate[dateStr][status] += count;
+      stats.byDate[dateStr].total += count;
+      stats.byEventType[result.attendance_eventtype][status] += count;
+      stats.byEventType[result.attendance_eventtype].total += count;
     }
+
+    return stats;
+  }
+
+  private async checkUserLeave(userId: number, date: Date): Promise<Leave | null> {
+    const formattedDate = new Date(date);
+    formattedDate.setHours(0, 0, 0, 0);
+
+    return this.leaveRepository
+      .createQueryBuilder('leave')
+      .where('leave.userId = :userId', { userId })
+      .andWhere('leave.startDate <= :date', { date: formattedDate })
+      .andWhere('leave.endDate >= :date', { date: formattedDate })
+      .leftJoinAndSelect('leave.user', 'user')
+      .getOne();
+  }
+
+  async findByDateRange(startDate: Date, endDate: Date): Promise<Attendance[]> {
+    return this.attendanceRepository
+      .createQueryBuilder('attendance')
+      .leftJoinAndSelect('attendance.user', 'user')
+      .where('attendance.date BETWEEN :startDate AND :endDate', {
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      })
+      .orderBy('attendance.date', 'DESC')
+      .addOrderBy('attendance.startTime', 'ASC')
+      .getMany();
+  }
+
+  async findByUserAndDateRange(
+    userId: number,
+    startDate: Date,
+    endDate: Date
+  ): Promise<Attendance[]> {
+    return this.attendanceRepository
+      .createQueryBuilder('attendance')
+      .leftJoinAndSelect('attendance.user', 'user')
+      .where('attendance.userId = :userId', { userId })
+      .andWhere('attendance.date BETWEEN :startDate AND :endDate', {
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      })
+      .orderBy('attendance.date', 'DESC')
+      .addOrderBy('attendance.startTime', 'ASC')
+      .getMany();
   }
 }

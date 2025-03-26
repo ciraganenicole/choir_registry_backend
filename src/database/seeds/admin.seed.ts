@@ -10,22 +10,22 @@ export const adminSeeder = async (dataSource: DataSource) => {
   const admins = [
     {
       email: 'superadmin@example.com',
-      name: 'Super Admin',
+      username: 'Super Admin',
       role: AdminRole.SUPER_ADMIN,
     },
     {
       email: 'adminlouado@example.com',
-      name: 'Louado Admin',
+      username: 'Louado Admin',
       role: AdminRole.LOUADO_ADMIN,
     },
     {
       email: 'adminadmin@example.com',
-      name: 'Administration Admin',
+      username: 'Administration Admin',
       role: AdminRole.ADMINISTRATION_ADMIN,
     },
     {
       email: 'admincaisse@example.com',
-      name: 'Caisse Admin',
+      username: 'Caisse Admin',
       role: AdminRole.CAISSE_ADMIN,
     },
   ];

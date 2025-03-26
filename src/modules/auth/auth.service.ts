@@ -43,7 +43,7 @@ export class AuthService {
             sub: admin.id, 
             email: admin.email, 
             role: admin.role,
-            name: admin.name
+            username: admin.username
         };
 
         return {
@@ -51,7 +51,7 @@ export class AuthService {
             user: {
                 id: admin.id,
                 email: admin.email,
-                name: admin.name,
+                username: admin.username,
                 role: admin.role
             }
         };
@@ -89,7 +89,7 @@ export class AuthService {
                 user: {
                     id: superAdmin.id,
                     email: superAdmin.email,
-                    name: superAdmin.name,
+                    username: superAdmin.username,
                     role: superAdmin.role,
                 }
             };
@@ -109,7 +109,7 @@ export class AuthService {
             sub: user.id, 
             email: user.email, 
             role: user.role,
-            name: user.name
+            username: user.username
         };
 
         return {

@@ -14,11 +14,13 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { User } from './user.entity';
-import { CreateUserDto, UpdateUserDto } from '../../common/dtos/user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 import { UserCategory } from './enums/user-category.enum';
 import { API_ROUTES } from '../../common/routes/api.routes';
 import { UserFilterDto } from '../../common/dtos/user-filter.dto';
+import { Transaction } from '../transactions/transaction.entity';
 
 @ApiTags('Users')
 @Controller()
@@ -77,5 +79,12 @@ export class UsersController {
   @ApiParam({ name: 'category', enum: UserCategory })
   async getUsersByCategory(@Param('category') category: UserCategory): Promise<User[]> {
     return this.usersService.getUsersByCategory(category);
+  }
+
+  @Get(API_ROUTES.USERS.TRANSACTIONS)
+  @ApiOperation({ summary: 'Get user transactions' })
+  @ApiParam({ name: 'id', type: Number })
+  async getUserTransactions(@Param('id', ParseIntPipe) id: number): Promise<Transaction[]> {
+    return this.usersService.getUserTransactions(id);
   }
 } 

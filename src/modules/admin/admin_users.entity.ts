@@ -18,14 +18,18 @@ export class AdminUser {
   password: string;
 
   @Column()
-  name: string;
+  username: string;
 
-  @Column({ type: 'enum', enum: AdminRole })
+  @Column({ 
+    type: 'varchar',
+    enum: AdminRole,
+    default: AdminRole.CHOIR_ADMIN
+  })
   role: AdminRole;
 
   @CreateDateColumn()
-  created_at: Date;
+  createdAt: Date;
 
-  @Column({ name: 'is_active', default: true })
+  @Column({ name: 'isActive', default: true })
   isActive: boolean;
 } 
