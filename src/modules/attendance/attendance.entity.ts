@@ -1,11 +1,18 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
+import { 
+    Entity, 
+    PrimaryGeneratedColumn, 
+    Column, 
+    ManyToOne, 
+    CreateDateColumn, 
+    UpdateDateColumn, 
+    JoinColumn 
+} from 'typeorm';
 import { User } from '../users/user.entity';
 
 export enum AttendanceStatus {
     PRESENT = 'PRESENT',
-    ABSENT = 'ABSENT',
     LATE = 'LATE',
-    EXCUSED = 'EXCUSED'
+    ABSENT = 'ABSENT'
 }
 
 export enum AttendanceType {
@@ -14,12 +21,21 @@ export enum AttendanceType {
 }
 
 export enum AttendanceEventType {
-    NORMAL = 'NORMAL',          // Regular daily attendance
-    WORSHIPPER = 'WORSHIPPER',  // Worshipper practice/performance
-    COMMITTEE = 'COMMITTEE',    // Administrative meetings
-    MUSIC = 'MUSIC',           // Music practice/performance
-    SUNDAY_SERVICE = 'SUNDAY_SERVICE', // Sunday service
-    SPECIAL = 'SPECIAL'        // Special events
+    REHEARSAL = 'REHEARSAL',  
+    SUNDAY_SERVICE = 'SUNDAY_SERVICE', 
+    LOUADO = 'LOUADO',  
+    MUSIC = 'MUSIC', 
+    COMMITTEE = 'COMMITTEE', 
+    OTHER = 'OTHER'  
+}
+
+export enum JustificationReason {
+    ILLNESS = 'ILLNESS',
+    WORK = 'WORK',
+    TRAVEL = 'TRAVEL',
+    FAMILY_EMERGENCY = 'FAMILY_EMERGENCY',
+    SCHOOL = 'SCHOOL',
+    OTHER = 'OTHER'
 }
 
 @Entity('attendance')
@@ -34,29 +50,22 @@ export class Attendance {
     @Column()
     userId: number;
 
-    @Column()
-    eventName: string;
-
     @Column({
         type: 'varchar',
         enum: AttendanceEventType,
-        default: AttendanceEventType.NORMAL
+        default: AttendanceEventType.OTHER
     })
     eventType: AttendanceEventType;
 
     @Column({ type: 'date' })
     date: Date;
 
-    @Column({ type: 'text' })
-    startTime: string;
-
-    @Column({ type: 'text' })
-    endTime: string;
+    @Column({ type: 'time', nullable: true }) // Nullable for absentees
+    timeIn?: string;
 
     @Column({
         type: 'varchar',
-        enum: AttendanceStatus,
-        default: AttendanceStatus.PRESENT
+        enum: AttendanceStatus
     })
     status: AttendanceStatus;
 
@@ -67,11 +76,12 @@ export class Attendance {
     })
     type: AttendanceType;
 
-    @Column({ default: false })
-    justified: boolean;
-
-    @Column({ type: 'text', nullable: true })
-    justification?: string;
+    @Column({
+        type: 'varchar',
+        enum: JustificationReason,
+        nullable: true  // Nullable if no justification provided
+    })
+    justification?: JustificationReason;
 
     @CreateDateColumn()
     createdAt: Date;

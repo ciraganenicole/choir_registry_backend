@@ -11,6 +11,8 @@ import { Leave } from '../leave/leave.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { AppDataSource } from '../../data-source';
 
+//Nullable values except firstname & lastname
+
 @Entity('users')
 export class User {
     @PrimaryGeneratedColumn()
@@ -24,56 +26,61 @@ export class User {
 
     @Column({
         type: 'varchar',
-        enum: Gender
+        enum: Gender,
+        nullable: true
     })
     gender: Gender; // SEXE
 
     @Column({
         type: 'varchar',
-        enum: MaritalStatus
+        enum: MaritalStatus,
+        nullable: true
     })
     maritalStatus: MaritalStatus; // ETAT CIVIL
 
     @Column({
         type: 'varchar',
-        enum: EducationLevel
+        enum: EducationLevel,
+        nullable: true
     })
     educationLevel: EducationLevel;
 
     @Column({
         type: 'varchar',
-        enum: Profession
+        enum: Profession,
+        nullable: true
     })
     profession: Profession;
 
     @Column({ nullable: true })
     competenceDomain: string; // DOMAINE DE COMPETENCE
 
-    @Column()
+    @Column({ nullable: true })
     churchOfOrigin: string; // EGLISE DE PROVENANCE
 
     @Column({
         type: 'varchar',
-        enum: Commune
+        enum: Commune,
+        nullable: true
     })
     commune: Commune;
 
-    @Column()
+    @Column({ nullable: true })
     quarter: string; // QUARTIER
 
-    @Column()
+    @Column({ nullable: true })
     reference: string; // REFERENCE
 
-    @Column()
+    @Column({ nullable: true })
     address: string; // AVENUE/N°
 
-    @Column({ unique: true })
+    @Column({ unique: true, nullable: true })
     phoneNumber: string; // TELEPHONE MOBILE
 
     @Column({ nullable: true })
     whatsappNumber: string; // NUMERO WHATSAPP
 
-    @Column({ unique: true })
+    @Column({ unique: true, nullable: true })
     email: string;
 
     @Column({ nullable: true })
@@ -83,6 +90,7 @@ export class User {
         type: 'varchar',
         array: true,
         default: '{}',
+        nullable: true,
         transformer: {
             to: (value: Commission[]): string[] => value ? value.map(v => v.toString()) : [],
             from: (value: string[]): Commission[] => value ? value.map(v => v as Commission) : []
@@ -97,6 +105,7 @@ export class User {
         type: 'varchar',
         array: true,
         default: '{NORMAL}',
+        nullable: true,
         transformer: {
             to: (value: UserCategory[]): string[] => value ? value.map(v => v.toString()) : [UserCategory.NORMAL],
             from: (value: string[]): UserCategory[] => value ? value.map(v => v as UserCategory) : [UserCategory.NORMAL]
@@ -113,7 +122,7 @@ export class User {
     @Column({ type: 'date', nullable: true })
     joinDate: Date;
 
-    @Column({ default: true })
+    @Column({ default: true, nullable: true })
     isActive: boolean;
 
     @Column({ nullable: true })
@@ -137,7 +146,8 @@ export class User {
     @AfterInsert()
     async generateMatricule() {
         if (this.id && !this.matricule) {
-            this.matricule = `NJC-${this.id}`;
+            const year = this.joinDate ? this.joinDate.getFullYear() : new Date().getFullYear();
+            this.matricule = `NJC-${this.id}-${year}`;
             await AppDataSource.getRepository(User).update(this.id, { matricule: this.matricule });
         }
     }

@@ -2,10 +2,9 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, Like } from 'typeorm';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
-import { Attendance, AttendanceStatus, AttendanceType, AttendanceEventType } from './attendance.entity';
+import { Attendance, AttendanceStatus, AttendanceType, AttendanceEventType, JustificationReason } from './attendance.entity';
 import { UsersService } from '../users/users.service';
 import { LeavesService } from '../leave/leave.service';
-import { format } from 'date-fns';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { User } from '../users/user.entity';
 import { AttendanceFilterDto } from './dto/attendance-filter.dto';
@@ -27,7 +26,6 @@ interface AttendanceStats {
     present: number;
     absent: number;
     late: number;
-    excused: number;
     presentPercentage: number;
 }
 
@@ -67,7 +65,7 @@ export class AttendanceService {
   ) {}
 
   async create(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
-    const { date, startTime, endTime, ...rest } = createAttendanceDto;
+    const { date, eventType, ...rest } = createAttendanceDto;
 
     // Format the date
     const formattedDate = new Date(date);
@@ -79,19 +77,28 @@ export class AttendanceService {
       formattedDate
     );
 
-    // Create the attendance record with formatted values
-    const attendance = this.attendanceRepository.create({
+    // If user is on leave, mark as ABSENT with justification
+    if (leaveRecord) {
+      const attendance = new Attendance();
+      Object.assign(attendance, {
+        ...rest,
+        date: formattedDate,
+        eventType,
+        status: AttendanceStatus.ABSENT,
+        justification: JustificationReason.OTHER,
+        type: AttendanceType.MANUAL
+      });
+      return this.attendanceRepository.save(attendance);
+    }
+
+    // Create the attendance record
+    const attendance = new Attendance();
+    Object.assign(attendance, {
       ...rest,
       date: formattedDate,
-      startTime: startTime.substring(0, 5), // Ensure HH:MM format
-      endTime: endTime.substring(0, 5), // Ensure HH:MM format
+      eventType,
+      type: AttendanceType.MANUAL
     });
-
-    if (leaveRecord) {
-      attendance.status = AttendanceStatus.ABSENT;
-      attendance.justified = true;
-      attendance.justification = `On leave: ${leaveRecord.reason}`;
-    }
 
     return this.attendanceRepository.save(attendance);
   }
@@ -182,13 +189,13 @@ export class AttendanceService {
     }
 
     return query.orderBy('attendance.date', 'DESC')
-      .addOrderBy('attendance.startTime', 'DESC')
+      .addOrderBy('attendance.timeIn', 'DESC')
       .getMany();
   }
 
   async update(id: number, updateAttendanceDto: UpdateAttendanceDto): Promise<Attendance> {
     const attendance = await this.findOne(id);
-    const { date, startTime, endTime, ...rest } = updateAttendanceDto;
+    const { date, eventType, ...rest } = updateAttendanceDto;
     
     let formattedDate = attendance.date;
     if (date) {
@@ -203,8 +210,7 @@ export class AttendanceService {
 
       if (leaveRecord) {
         rest.status = AttendanceStatus.ABSENT;
-        rest.justified = true;
-        rest.justification = `On leave: ${leaveRecord.reason}`;
+        rest.justification = JustificationReason.OTHER;
       }
     }
 
@@ -220,8 +226,7 @@ export class AttendanceService {
     Object.assign(attendance, {
       ...rest,
       date: formattedDate,
-      ...(startTime && { startTime: startTime.substring(0, 5) }), // Ensure HH:MM format if provided
-      ...(endTime && { endTime: endTime.substring(0, 5) }), // Ensure HH:MM format if provided
+      eventType: eventType || attendance.eventType
     });
 
     return this.attendanceRepository.save(attendance);
@@ -241,9 +246,20 @@ export class AttendanceService {
     });
   }
 
-  async justifyAbsence(id: number, justified: boolean): Promise<Attendance> {
+  async justifyAbsence(id: number, justification: JustificationReason): Promise<Attendance> {
     const attendance = await this.findOne(id);
-    attendance.justified = justified;
+    
+    // Check if user is on leave
+    const leaveRecord = await this.checkUserLeave(
+      attendance.userId,
+      attendance.date
+    );
+
+    if (leaveRecord) {
+      throw new BadRequestException('Cannot justify absence for a user on leave');
+    }
+
+    attendance.justification = justification;
     return this.attendanceRepository.save(attendance);
   }
 
@@ -261,14 +277,12 @@ export class AttendanceService {
     const present = attendances.filter(a => a.status === AttendanceStatus.PRESENT).length;
     const absent = attendances.filter(a => a.status === AttendanceStatus.ABSENT).length;
     const late = attendances.filter(a => a.status === AttendanceStatus.LATE).length;
-    const excused = attendances.filter(a => a.status === AttendanceStatus.EXCUSED).length;
 
     return {
       total,
       present,
       absent,
       late,
-      excused,
       presentPercentage: total > 0 ? (present / total) * 100 : 0,
     };
   }
@@ -351,6 +365,7 @@ export class AttendanceService {
       .where('leave.userId = :userId', { userId })
       .andWhere('leave.startDate <= :date', { date: formattedDate })
       .andWhere('leave.endDate >= :date', { date: formattedDate })
+      .andWhere('leave.status = :status', { status: 'APPROVED' })
       .leftJoinAndSelect('leave.user', 'user')
       .getOne();
   }
@@ -364,7 +379,7 @@ export class AttendanceService {
         endDate: endDate.toISOString().split('T')[0]
       })
       .orderBy('attendance.date', 'DESC')
-      .addOrderBy('attendance.startTime', 'ASC')
+      .addOrderBy('attendance.timeIn', 'ASC')
       .getMany();
   }
 
@@ -382,7 +397,7 @@ export class AttendanceService {
         endDate: endDate.toISOString().split('T')[0]
       })
       .orderBy('attendance.date', 'DESC')
-      .addOrderBy('attendance.startTime', 'ASC')
+      .addOrderBy('attendance.timeIn', 'ASC')
       .getMany();
   }
 }

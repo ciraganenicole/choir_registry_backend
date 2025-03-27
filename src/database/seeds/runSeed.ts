@@ -4,6 +4,8 @@ import { userSeeder } from './user.seed';
 import { TransactionSeeder } from './transaction.seed';
 import { seedLeaves } from './leaves.seed';
 import { seedAttendance } from './attendance.seed';
+import { DataSource } from 'typeorm';
+import { seedUsers } from './users.seed';
 
 const runSeed = async () => {
   try {
@@ -22,8 +24,9 @@ const runSeed = async () => {
     // await userSeeder(AppDataSource);
     // await new TransactionSeeder().run(AppDataSource);
     // await seedEvents(AppDataSource);
-    await seedLeaves(AppDataSource);
+    // await seedLeaves(AppDataSource);
     await seedAttendance(AppDataSource);
+    // await seedUsers(AppDataSource);
     console.log('🎉 Seeding completed successfully!');
 
   } catch (error) {
@@ -36,3 +39,16 @@ const runSeed = async () => {
 };
 
 runSeed();
+
+export const runSeedWithDataSource = async (dataSource: DataSource): Promise<void> => {
+    try {
+        // Run seeders in sequence
+        await seedUsers(dataSource);
+        await seedAttendance(dataSource);
+        
+        console.log('All seeders completed successfully');
+    } catch (error) {
+        console.error('Error running seeders:', error);
+        throw error;
+    }
+};

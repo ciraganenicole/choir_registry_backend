@@ -161,7 +161,7 @@ export class UsersService implements OnModuleInit {
             .where('user.id = :id', { id })
             .orderBy({
                 'attendance.date': 'DESC',
-                'attendance.startTime': 'ASC',
+                'attendance.timeIn': 'ASC',
                 'leave.startDate': 'DESC',
                 'transaction.transactionDate': 'DESC'
             })
@@ -183,7 +183,7 @@ export class UsersService implements OnModuleInit {
             .where('user.id = :userId', { userId })
             .orderBy({
                 'attendance.date': 'DESC',
-                'attendance.startTime': 'ASC',
+                'attendance.timeIn': 'ASC',
                 'leave.startDate': 'DESC',
                 'transaction.transactionDate': 'DESC'
             })
@@ -292,7 +292,7 @@ export class UsersService implements OnModuleInit {
         queryBuilder
             .orderBy(`user.${sortBy}`, order)
             .addOrderBy('attendance.date', 'DESC')
-            .addOrderBy('attendance.startTime', 'ASC')
+            .addOrderBy('attendance.timeIn', 'ASC')
             .addOrderBy('leave.startDate', 'DESC')
             .addOrderBy('transaction.transactionDate', 'DESC')
             .skip(skip)
