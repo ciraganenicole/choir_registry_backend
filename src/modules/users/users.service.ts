@@ -84,7 +84,7 @@ export class UsersService implements OnModuleInit {
             commission, 
             category, 
             page = 1, 
-            limit = 10, 
+            limit = 8, 
             sortBy = 'firstName', 
             order = 'ASC', 
             letter 

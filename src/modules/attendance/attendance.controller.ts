@@ -8,11 +8,6 @@ import {
     Param, 
     Query, 
     ParseIntPipe,
-    BadRequestException,
-    NotFoundException,
-    ValidationPipe,
-    UsePipes,
-    DefaultValuePipe,
 } from '@nestjs/common';
 import { API_ROUTES } from '../../common/routes/api.routes';
 import { AttendanceService } from './attendance.service';
