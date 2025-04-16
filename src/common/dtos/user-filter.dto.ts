@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsNumber, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Gender } from '../../modules/users/enums/gender.enum';
 import { MaritalStatus } from '../../modules/users/enums/marital-status.enum';
@@ -43,19 +43,23 @@ export class UserFilterDto {
 
     @IsOptional()
     @Type(() => Number)
-    page?: number = 1;
+    @IsNumber()
+    @Min(1)
+    page?: number;
 
     @IsOptional()
     @Type(() => Number)
-    limit?: number = 10;
+    @IsNumber()
+    @Min(1)
+    limit?: number;
 
     @IsOptional()
     @IsString()
-    sortBy?: 'firstName' | 'lastName' | 'joinDate' | 'educationLevel';
+    sortBy?: string;
 
     @IsOptional()
-    @IsEnum(['ASC', 'DESC'])
-    order?: 'ASC' | 'DESC' = 'ASC';
+    @IsString()
+    sortOrder?: 'ASC' | 'DESC';
 
     @IsOptional()
     @IsString()

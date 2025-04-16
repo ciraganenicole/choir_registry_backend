@@ -36,7 +36,14 @@ export class TransactionController {
 
   @Get()
   async findAll(@Query() filterDto: TransactionFilterDto) {
-    return this.transactionService.findAll(filterDto);
+    console.log('Received query params:', filterDto);
+    try {
+      const result = await this.transactionService.findAll(filterDto);
+      return result;
+    } catch (error) {
+      console.error('Error in findAll:', error);
+      throw error;
+    }
   }
 
   @Get('daily')

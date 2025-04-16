@@ -1,6 +1,6 @@
 import { IsDate, IsEnum, IsOptional, IsString, IsNumber } from 'class-validator';
+import { TransactionType } from '../enums/transactions-categories.enum';
 import { Type } from 'class-transformer';
-import { TransactionType } from '../transactions-categories.enum';
 
 export class DailyContributionFilterDto {
     @IsOptional()

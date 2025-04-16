@@ -156,13 +156,10 @@ export class UsersService implements OnModuleInit {
         const user = await this.userRepository
             .createQueryBuilder('user')
             .leftJoinAndSelect('user.attendances', 'attendance')
-            .leftJoinAndSelect('user.leaves', 'leave')
             .leftJoinAndSelect('user.transactions', 'transaction')
             .where('user.id = :id', { id })
             .orderBy({
                 'attendance.date': 'DESC',
-                'attendance.timeIn': 'ASC',
-                'leave.startDate': 'DESC',
                 'transaction.transactionDate': 'DESC'
             })
             .getOne();
@@ -174,17 +171,14 @@ export class UsersService implements OnModuleInit {
         return user;
     }
 
-    async getUserWithAttendanceAndLeaves(userId: number): Promise<User> {
+    async getUserWithAttendanceAndTransactions(userId: number): Promise<User> {
         const user = await this.userRepository
             .createQueryBuilder('user')
             .leftJoinAndSelect('user.attendances', 'attendance')
-            .leftJoinAndSelect('user.leaves', 'leave')
             .leftJoinAndSelect('user.transactions', 'transaction')
             .where('user.id = :userId', { userId })
             .orderBy({
                 'attendance.date': 'DESC',
-                'attendance.timeIn': 'ASC',
-                'leave.startDate': 'DESC',
                 'transaction.transactionDate': 'DESC'
             })
             .getOne();
@@ -215,7 +209,7 @@ export class UsersService implements OnModuleInit {
     async getUsersByCategory(category: UserCategory): Promise<User[]> {
         return this.userRepository.find({
             where: { categories: category },
-            relations: ['attendances', 'leaves', 'transactions'],
+            relations: ['attendances', 'transactions'],
             order: {
                 firstName: 'ASC',
                 lastName: 'ASC'
@@ -241,59 +235,27 @@ export class UsersService implements OnModuleInit {
     }
 
     async findAll(filterDto: UserFilterDto): Promise<[User[], number]> {
-        const { search, gender, maritalStatus, educationLevel, profession, commune, commission, category, page = 1, limit = 10, sortBy = 'createdAt', order = 'DESC', letter } = filterDto;
+        const { page = 1, limit = 10, search, sortBy = 'firstName', order = 'ASC' } = filterDto;
         const skip = (page - 1) * limit;
 
         const queryBuilder = this.userRepository
             .createQueryBuilder('user')
             .leftJoinAndSelect('user.attendances', 'attendance')
-            .leftJoinAndSelect('user.leaves', 'leave')
             .leftJoinAndSelect('user.transactions', 'transaction');
 
         if (search) {
             queryBuilder.andWhere(
-                '(LOWER(user.firstName) LIKE LOWER(:search) OR LOWER(user.lastName) LIKE LOWER(:search) OR LOWER(user.email) LIKE LOWER(:search) OR LOWER(user.phoneNumber) LIKE LOWER(:search))',
+                '(LOWER(user.firstName) LIKE LOWER(:search) OR LOWER(user.lastName) LIKE LOWER(:search) OR LOWER(user.matricule) LIKE LOWER(:search))',
                 { search: `%${search}%` }
             );
         }
 
-        if (letter) {
-            queryBuilder.andWhere('LOWER(user.lastName) LIKE LOWER(:letter)', { letter: `${letter}%` });
-        }
-
-        if (gender) {
-            queryBuilder.andWhere('user.gender = :gender', { gender });
-        }
-
-        if (maritalStatus) {
-            queryBuilder.andWhere('user.maritalStatus = :maritalStatus', { maritalStatus });
-        }
-
-        if (educationLevel) {
-            queryBuilder.andWhere('user.educationLevel = :educationLevel', { educationLevel });
-        }
-
-        if (profession) {
-            queryBuilder.andWhere('user.profession = :profession', { profession });
-        }
-
-        if (commune) {
-            queryBuilder.andWhere('user.commune = :commune', { commune });
-        }
-
-        if (commission) {
-            queryBuilder.andWhere(':commission = ANY(user.commissions)', { commission });
-        }
-
-        if (category) {
-            queryBuilder.andWhere(':category = ANY(user.categories)', { category });
+        if (sortBy) {
+            queryBuilder.orderBy(`user.${sortBy}`, order);
         }
 
         queryBuilder
-            .orderBy(`user.${sortBy}`, order)
             .addOrderBy('attendance.date', 'DESC')
-            .addOrderBy('attendance.timeIn', 'ASC')
-            .addOrderBy('leave.startDate', 'DESC')
             .addOrderBy('transaction.transactionDate', 'DESC')
             .skip(skip)
             .take(limit);
@@ -304,7 +266,7 @@ export class UsersService implements OnModuleInit {
     async findOne(id: number): Promise<User> {
         const user = await this.userRepository.findOne({
             where: { id },
-            relations: ['attendances', 'leaves', 'transactions']
+            relations: ['attendances', 'transactions']
         });
 
         if (!user) {
@@ -319,7 +281,7 @@ export class UsersService implements OnModuleInit {
             where: {
                 categories: In([category])
             },
-            relations: ['attendances', 'leaves', 'transactions']
+            relations: ['attendances', 'transactions']
         });
     }
 

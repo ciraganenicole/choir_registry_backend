@@ -4,11 +4,9 @@ import { Repository, Between, Like } from 'typeorm';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { Attendance, AttendanceStatus, AttendanceType, AttendanceEventType, JustificationReason } from './attendance.entity';
 import { UsersService } from '../users/users.service';
-import { LeavesService } from '../leave/leave.service';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { User } from '../users/user.entity';
 import { AttendanceFilterDto } from './dto/attendance-filter.dto';
-import { Leave } from '../leave/leave.entity';
 
 interface AttendancePaginationOptions {
   page?: number;
@@ -59,9 +57,6 @@ export class AttendanceService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly usersService: UsersService,
-    private readonly leavesService: LeavesService,
-    @InjectRepository(Leave)
-    private readonly leaveRepository: Repository<Leave>
   ) {}
 
   async create(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
@@ -70,26 +65,6 @@ export class AttendanceService {
     // Format the date
     const formattedDate = new Date(date);
     formattedDate.setHours(0, 0, 0, 0);
-
-    // Check if user is on leave
-    const leaveRecord = await this.checkUserLeave(
-      createAttendanceDto.userId,
-      formattedDate
-    );
-
-    // If user is on leave, mark as ABSENT with justification
-    if (leaveRecord) {
-      const attendance = new Attendance();
-      Object.assign(attendance, {
-        ...rest,
-        date: formattedDate,
-        eventType,
-        status: AttendanceStatus.ABSENT,
-        justification: JustificationReason.OTHER,
-        type: AttendanceType.MANUAL
-      });
-      return this.attendanceRepository.save(attendance);
-    }
 
     // Create the attendance record
     const attendance = new Attendance();
@@ -201,17 +176,6 @@ export class AttendanceService {
     if (date) {
       formattedDate = new Date(date);
       formattedDate.setHours(0, 0, 0, 0);
-      
-      // Check if user is on leave for the new date
-      const leaveRecord = await this.checkUserLeave(
-        attendance.userId,
-        formattedDate
-      );
-
-      if (leaveRecord) {
-        rest.status = AttendanceStatus.ABSENT;
-        rest.justification = JustificationReason.OTHER;
-      }
     }
 
     if (rest.userId) {
@@ -248,17 +212,6 @@ export class AttendanceService {
 
   async justifyAbsence(id: number, justification: JustificationReason): Promise<Attendance> {
     const attendance = await this.findOne(id);
-    
-    // Check if user is on leave
-    const leaveRecord = await this.checkUserLeave(
-      attendance.userId,
-      attendance.date
-    );
-
-    if (leaveRecord) {
-      throw new BadRequestException('Cannot justify absence for a user on leave');
-    }
-
     attendance.justification = justification;
     return this.attendanceRepository.save(attendance);
   }
@@ -354,20 +307,6 @@ export class AttendanceService {
     }
 
     return stats;
-  }
-
-  private async checkUserLeave(userId: number, date: Date): Promise<Leave | null> {
-    const formattedDate = new Date(date);
-    formattedDate.setHours(0, 0, 0, 0);
-
-    return this.leaveRepository
-      .createQueryBuilder('leave')
-      .where('leave.userId = :userId', { userId })
-      .andWhere('leave.startDate <= :date', { date: formattedDate })
-      .andWhere('leave.endDate >= :date', { date: formattedDate })
-      .andWhere('leave.status = :status', { status: 'APPROVED' })
-      .leftJoinAndSelect('leave.user', 'user')
-      .getOne();
   }
 
   async findByDateRange(startDate: Date, endDate: Date): Promise<Attendance[]> {

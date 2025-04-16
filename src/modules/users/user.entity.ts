@@ -7,7 +7,6 @@ import { Commune } from './enums/commune.enum';
 import { Commission } from './enums/commission.enum';
 import { UserCategory } from './enums/user-category.enum';
 import { Attendance } from '../attendance/attendance.entity';
-import { Leave } from '../leave/leave.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { AppDataSource } from '../../data-source';
 
@@ -134,14 +133,11 @@ export class User {
     @UpdateDateColumn()
     updatedAt: Date;
 
-    @OneToMany(() => Attendance, attendance => attendance.user)
-    attendances: Attendance[];
-
-    @OneToMany(() => Leave, leave => leave.user)
-    leaves: Leave[];
-
     @OneToMany(() => Transaction, transaction => transaction.contributor)
     transactions: Transaction[];
+
+    @OneToMany(() => Attendance, attendance => attendance.user)
+    attendances: Attendance[];
 
     @AfterInsert()
     async generateMatricule() {

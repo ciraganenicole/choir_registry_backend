@@ -4,9 +4,10 @@ import {
   TransactionType, 
   IncomeCategories,
   ExpenseCategories,
-  TransactionCategories 
-} from '../../modules/transactions/transactions-categories.enum';
+} from '../../modules/transactions/enums/transactions-categories.enum';
 import { Currency } from '../../modules/transactions/transaction.entity';
+
+type TransactionCategories = IncomeCategories | ExpenseCategories;
 
 export class CreateTransactionDto {
   @IsNumber()
