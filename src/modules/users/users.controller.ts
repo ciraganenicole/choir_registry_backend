@@ -11,9 +11,8 @@ import {
   ValidationPipe,
   UsePipes,
   Query,
-  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -46,17 +45,6 @@ export class UsersController {
       page: filterDto.page || 1,
       limit: filterDto.limit || 10
     };
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID with attendance and transactions' })
-  @ApiResponse({ status: 200, description: 'Returns a user with their attendance and transactions' })
-  async findOne(@Param('id') id: string): Promise<User> {
-    const userId = parseInt(id, 10);
-    if (isNaN(userId)) {
-        throw new BadRequestException('Invalid user ID');
-    }
-    return this.usersService.getUserWithAttendanceAndTransactions(userId);
   }
 
   @Post(API_ROUTES.USERS.BASE)
