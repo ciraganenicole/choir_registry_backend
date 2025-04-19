@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, BeforeInsert, ManyToOne, JoinColumn, AfterInsert, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, BeforeInsert, ManyToOne, JoinColumn, AfterInsert, ManyToMany, JoinTable, EntityManager } from 'typeorm';
 import { Gender } from './enums/gender.enum';
 import { MaritalStatus } from './enums/marital-status.enum';
 import { EducationLevel } from './enums/education-level.enum';
@@ -8,7 +8,6 @@ import { Commission } from './enums/commission.enum';
 import { UserCategory } from './enums/user-category.enum';
 import { Attendance } from '../attendance/attendance.entity';
 import { Transaction } from '../transactions/transaction.entity';
-import { AppDataSource } from '../../data-source';
 
 //Nullable values except firstname & lastname
 
@@ -140,11 +139,19 @@ export class User {
     attendances: Attendance[];
 
     @AfterInsert()
-    async generateMatricule() {
+    async generateMatricule(manager?: EntityManager) {
         if (this.id && !this.matricule) {
             const year = this.joinDate ? this.joinDate.getFullYear() : new Date().getFullYear();
             this.matricule = `NJC-${this.id}-${year}`;
-            await AppDataSource.getRepository(User).update(this.id, { matricule: this.matricule });
+            
+            if (manager) {
+                await manager
+                    .createQueryBuilder()
+                    .update(User)
+                    .set({ matricule: this.matricule })
+                    .where("id = :id", { id: this.id })
+                    .execute();
+            }
         }
     }
 }

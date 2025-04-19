@@ -191,8 +191,29 @@ export class UsersService implements OnModuleInit {
     }
 
     async createUser(userData: CreateUserDto): Promise<User> {
-        const user = this.userRepository.create(userData);
-        return this.userRepository.save(user);
+        const queryRunner = this.userRepository.manager.connection.createQueryRunner();
+        await queryRunner.connect();
+        await queryRunner.startTransaction();
+
+        try {
+            const user = this.userRepository.create(userData);
+            const savedUser = await queryRunner.manager.save(user);
+            
+            // Generate matricule
+            if (savedUser.id) {
+                const year = savedUser.joinDate ? savedUser.joinDate.getFullYear() : new Date().getFullYear();
+                savedUser.matricule = `NJC-${savedUser.id}-${year}`;
+                await queryRunner.manager.update(User, savedUser.id, { matricule: savedUser.matricule });
+            }
+
+            await queryRunner.commitTransaction();
+            return savedUser;
+        } catch (error) {
+            await queryRunner.rollbackTransaction();
+            throw error;
+        } finally {
+            await queryRunner.release();
+        }
     }
 
     async updateUser(id: number, userData: UpdateUserDto): Promise<User> {
