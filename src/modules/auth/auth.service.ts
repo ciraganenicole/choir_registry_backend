@@ -1,9 +1,10 @@
 import { Injectable, UnauthorizedException, ConflictException, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { AdminUsersService } from "../admin/admin_users.service";
-import { AdminRole } from "../admin/admin-role.enum";
 import { LoginDto, RegisterAdminDto } from "../../common/dtos/auth.dto";
+import { CreateAdminDto } from "../../common/dtos/admin.dto";
 import * as bcrypt from "bcrypt";
+import { AdminRole } from "../admin/admin-role.enum";
 
 @Injectable()
 export class AuthService {
@@ -41,9 +42,9 @@ export class AuthService {
 
         const payload = { 
             sub: admin.id, 
-            email: admin.email, 
-            role: admin.role,
-            username: admin.username
+            email: admin.email,
+            username: admin.username,
+            role: admin.role
         };
 
         return {
@@ -60,7 +61,7 @@ export class AuthService {
     async createInitialSuperAdmin() {
         const email = process.env.SUPER_ADMIN_EMAIL || "super.admin@example.com";
         const password = process.env.SUPER_ADMIN_PASSWORD || "superadmin123";
-        const name = "Super Admin";
+        const username = "Super Admin";
 
         const existingUser = await this.adminUsersService.findOneByEmail(email);
         if (existingUser) {
@@ -70,18 +71,14 @@ export class AuthService {
 
         try {
             const hashedPassword = await bcrypt.hash(password, 10);
-            const adminData = {
+            const adminData: CreateAdminDto = {
                 email,
                 password: hashedPassword,
-                name,
-                role: AdminRole.SUPER_ADMIN,
-                phoneNumber: null
+                username,
+                role: AdminRole.SUPER_ADMIN
             };
 
-            const superAdmin = await this.adminUsersService.createAdmin(
-                adminData, 
-                AdminRole.SUPER_ADMIN // Special case for initial super admin
-            );
+            const superAdmin = await this.adminUsersService.createAdmin(adminData);
 
             this.logger.log("Super admin created successfully");
             return {
@@ -90,7 +87,7 @@ export class AuthService {
                     id: superAdmin.id,
                     email: superAdmin.email,
                     username: superAdmin.username,
-                    role: superAdmin.role,
+                    role: superAdmin.role
                 }
             };
         } catch (error) {
@@ -107,9 +104,9 @@ export class AuthService {
 
         const payload = { 
             sub: user.id, 
-            email: user.email, 
-            role: user.role,
-            username: user.username
+            email: user.email,
+            username: user.username,
+            role: user.role
         };
 
         return {

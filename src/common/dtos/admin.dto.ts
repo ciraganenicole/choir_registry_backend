@@ -10,10 +10,11 @@ export class CreateAdminDto {
     password: string;
 
     @IsString()
-    name: string;
+    username: string;
 
+    @IsOptional()
     @IsEnum(AdminRole)
-    role: AdminRole;
+    role?: AdminRole;
 }
 
 export class UpdateAdminDto {
@@ -28,7 +29,7 @@ export class UpdateAdminDto {
 
     @IsOptional()
     @IsString()
-    name?: string;
+    username?: string;
 
     @IsOptional()
     @IsEnum(AdminRole)

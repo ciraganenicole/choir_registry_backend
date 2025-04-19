@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
 } from 'typeorm';
+import { AdminRole } from './admin-role.enum';
 
 @Entity('admin_users')
 export class AdminUser {
@@ -18,6 +19,14 @@ export class AdminUser {
 
   @Column()
   username: string;
+
+  @Column({ 
+    type: 'varchar',
+    enum: AdminRole,
+    nullable: true,
+    default: null
+  })
+  role?: AdminRole;
 
   @CreateDateColumn()
   createdAt: Date;

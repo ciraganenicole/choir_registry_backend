@@ -4,6 +4,7 @@ import { Repository } from "typeorm";
 import { AdminUser } from "./admin_users.entity";
 import { CreateAdminDto, UpdateAdminDto } from "../../common/dtos/admin.dto";
 import * as bcrypt from "bcrypt";
+import { AdminRole } from "./admin-role.enum";
 
 @Injectable()
 export class AdminUsersService {
@@ -20,11 +21,13 @@ export class AdminUsersService {
 
         const hashedPassword = await bcrypt.hash(userData.password, 10);
         const newUser = this.adminUserRepository.create({
-            ...userData,
-            password: hashedPassword
+            email: userData.email,
+            password: hashedPassword,
+            username: userData.username,
+            role: userData.role || AdminRole.CHOIR_ADMIN
         });
 
-        return this.adminUserRepository.save(newUser);
+        return await this.adminUserRepository.save(newUser);
     }
 
     async findOneByEmail(email: string): Promise<AdminUser | null> {
