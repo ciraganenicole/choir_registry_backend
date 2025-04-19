@@ -10,9 +10,9 @@ async function bootstrap() {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
 
-  // Enable CORS for localhost:3000 (frontend)
+  // Enable CORS for frontend
   app.enableCors({
-    origin: 'https://njc-five.vercel.app/',
+    origin: 'https://njc-five.vercel.app',
     methods: 'GET, POST, PUT, DELETE',
     allowedHeaders: 'Content-Type, Authorization',
     credentials: true,
@@ -43,6 +43,6 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || 4000;
-await app.listen(port);
+  await app.listen(port);
 }
 bootstrap();
