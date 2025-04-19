@@ -7,13 +7,10 @@ import {
     Body, 
     Param,
     ValidationPipe,
-    UsePipes,
-    BadRequestException 
+    UsePipes
 } from '@nestjs/common';
 import { AdminUsersService } from './admin_users.service';
-import { AdminRole } from './admin-role.enum';
 import { CreateAdminDto, UpdateAdminDto } from '../../common/dtos/admin.dto';
-import { API_ROUTES } from '../../common/routes/api.routes';
 import { AdminUser } from './admin_users.entity';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -24,38 +21,30 @@ export class AdminController {
     @Post('create')
     @UsePipes(new ValidationPipe({ transform: true }))
     async createAdmin(
-        @Body() adminData: CreateAdminDto,
-        @CurrentUser() currentUser: AdminUser
+        @Body() adminData: CreateAdminDto
     ) {
-        return this.adminService.createAdmin(adminData, currentUser.role);
+        return this.adminService.createAdmin(adminData);
     }
 
     @Get('all')
-    async getAllAdmins(@CurrentUser() currentUser: AdminUser) {
-        return this.adminService.getAllAdmins(currentUser.role);
-    }
-
-    @Get('role/:role')
-    async getAdminsByRole(@Param('role') role: AdminRole) {
-        return this.adminService.getAdminsByRole(role);
+    async getAllAdmins() {
+        return this.adminService.getAllAdmins();
     }
 
     @Put(':id')
     @UsePipes(new ValidationPipe({ transform: true }))
     async updateAdmin(
         @Param('id') id: string,
-        @Body() updateData: UpdateAdminDto,
-        @CurrentUser() currentUser: AdminUser
+        @Body() updateData: UpdateAdminDto
     ) {
-        return this.adminService.updateAdmin(id, updateData, currentUser.role);
+        return this.adminService.updateAdmin(id, updateData);
     }
 
     @Delete(':id')
     async deactivateAdmin(
-        @Param('id') id: string,
-        @CurrentUser() currentUser: AdminUser
+        @Param('id') id: string
     ) {
-        await this.adminService.deactivateAdmin(id, currentUser.role);
+        await this.adminService.deactivateAdmin(id);
         return { message: 'Admin deactivated successfully' };
     }
 } 

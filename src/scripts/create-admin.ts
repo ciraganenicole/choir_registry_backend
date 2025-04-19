@@ -1,7 +1,6 @@
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { AdminUser } from '../modules/admin/admin_users.entity';
-import { AdminRole } from '../modules/admin/admin-role.enum';
 import { config } from 'dotenv';
 import { Table } from 'typeorm';
 
@@ -63,7 +62,6 @@ const createAdmin = async () => {
             {
               name: 'role',
               type: 'enum',
-              enum: Object.values(AdminRole),
             },
             {
               name: 'created_at',
@@ -92,22 +90,18 @@ const createAdmin = async () => {
       {
         email: 'superadmin@example.com',
         name: 'Super Admin',
-        role: AdminRole.SUPER_ADMIN,
       },
       {
         email: 'adminlouado@example.com',
         name: 'Louado Admin',
-        role: AdminRole.LOUADO_ADMIN,
       },
       {
         email: 'adminadmin@example.com',
         name: 'Administration Admin',
-        role: AdminRole.ADMINISTRATION_ADMIN,
       },
       {
         email: 'admincaisse@example.com',
         name: 'Caisse Admin',
-        role: AdminRole.CAISSE_ADMIN,
       },
     ];
 
