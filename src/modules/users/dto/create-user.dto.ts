@@ -15,45 +15,56 @@ export class CreateUserDto {
   lastName: string;
 
   @IsEnum(Gender)
-  gender: Gender;
+  @IsOptional()
+  gender?: Gender;
 
   @IsEnum(MaritalStatus)
-  maritalStatus: MaritalStatus;
+  @IsOptional()
+  maritalStatus?: MaritalStatus;
 
   @IsEnum(EducationLevel)
-  educationLevel: EducationLevel;
+  @IsOptional()
+  educationLevel?: EducationLevel;
 
   @IsEnum(Profession)
-  profession: Profession;
+  @IsOptional()
+  profession?: Profession;
 
   @IsString()
   @IsOptional()
   competenceDomain?: string;
 
   @IsString()
-  churchOfOrigin: string;
+  @IsOptional()
+  churchOfOrigin?: string;
 
   @IsEnum(Commune)
-  commune: Commune;
+  @IsOptional()
+  commune?: Commune;
 
   @IsString()
-  quarter: string;
+  @IsOptional()
+  quarter?: string;
 
   @IsString()
-  reference: string;
+  @IsOptional()
+  reference?: string;
 
   @IsString()
-  address: string;
+  @IsOptional()
+  address?: string;
 
   @IsString()
-  phoneNumber: string;
+  @IsOptional()
+  phoneNumber?: string;
 
   @IsString()
   @IsOptional()
   whatsappNumber?: string;
 
   @IsEmail()
-  email: string;
+  @IsOptional()
+  email?: string;
 
   @IsString()
   @IsOptional()
