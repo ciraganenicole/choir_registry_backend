@@ -256,36 +256,74 @@ export class TransactionService {
   }
 
   async getStats() {
-    const today = new Date();
-    const currentMonthStart = startOfMonth(today);
-    const currentMonthEnd = endOfMonth(today);
-    const lastMonthStart = startOfMonth(subMonths(today, 1));
-    const lastMonthEnd = endOfMonth(subMonths(today, 1));
+    const currentMonthStart = startOfMonth(new Date());
+    const currentMonthEnd = endOfMonth(new Date());
 
-    const [currentMonthTransactions, lastMonthTransactions] = await Promise.all([
-      this.transactionRepository.find({
-        where: {
-          transactionDate: Between(currentMonthStart, currentMonthEnd)
-        }
-      }),
-      this.transactionRepository.find({
-        where: {
-          transactionDate: Between(lastMonthStart, lastMonthEnd)
-        }
-      })
+    // Get all transactions
+    const transactions = await this.transactionRepository.find();
+
+    // Calculate totals by currency
+    const usdTransactions = transactions.filter(t => t.currency === Currency.USD);
+    const fcTransactions = transactions.filter(t => t.currency === Currency.FC);
+
+    // USD totals
+    const usdIncome = usdTransactions
+      .filter(t => t.type === TransactionType.INCOME)
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const usdExpense = usdTransactions
+      .filter(t => t.type === TransactionType.EXPENSE)
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    // FC totals
+    const fcIncome = fcTransactions
+      .filter(t => t.type === TransactionType.INCOME)
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const fcExpense = fcTransactions
+      .filter(t => t.type === TransactionType.EXPENSE)
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    // Get current month daily totals
+    const [dailyUsdTotal, dailyFcTotal] = await Promise.all([
+      this.transactionRepository
+        .createQueryBuilder('transaction')
+        .where('transaction.type = :type', { type: TransactionType.INCOME })
+        .andWhere('transaction.category = :category', { category: 'DAILY' })
+        .andWhere('transaction.currency = :currency', { currency: Currency.USD })
+        .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+          startDate: currentMonthStart,
+          endDate: currentMonthEnd,
+        })
+        .select('SUM(transaction.amount)', 'total')
+        .getRawOne(),
+      
+      this.transactionRepository
+        .createQueryBuilder('transaction')
+        .where('transaction.type = :type', { type: TransactionType.INCOME })
+        .andWhere('transaction.category = :category', { category: 'DAILY' })
+        .andWhere('transaction.currency = :currency', { currency: Currency.FC })
+        .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+          startDate: currentMonthStart,
+          endDate: currentMonthEnd,
+        })
+        .select('SUM(transaction.amount)', 'total')
+        .getRawOne()
     ]);
 
-    // Ensure amounts are numbers
-    const processTransactions = (transactions: Transaction[]) => {
-      return transactions.map(transaction => ({
-        ...transaction,
-        amount: Number(transaction.amount) || 0
-      }));
-    };
-
     return {
-      currentMonth: processTransactions(currentMonthTransactions),
-      lastMonth: processTransactions(lastMonthTransactions)
+      usd: {
+        totalIncome: usdIncome,
+        totalExpense: usdExpense,
+        netRevenue: usdIncome - usdExpense,
+        currentMonthDailyTotal: Number(dailyUsdTotal?.total || 0)
+      },
+      fc: {
+        totalIncome: fcIncome,
+        totalExpense: fcExpense,
+        netRevenue: fcIncome - fcExpense,
+        currentMonthDailyTotal: Number(dailyFcTotal?.total || 0)
+      }
     };
   }
 

@@ -11,7 +11,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "seed:admin": "ts-node src/database/seeds/runSeeds.ts",
+    "seed:admin": "ts-node src/database/seeds/runSeed.ts",
     "seed:users": "ts-node src/scripts/seed-users.ts",
     "db:start": "scripts/db.bat start",
     "db:stop": "scripts/db.bat stop",
@@ -26,7 +26,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "typeorm-ts-node-commonjs",
     "migration:run": "npm run typeorm -- migration:run -d src/data-source.ts",
-    "migration:generate": "npm run typeorm -- migration:generate -d src/data-source.ts",
+    "migration:generate": "npm run typeorm -- migration:generate src/database/migrations/schema -d src/data-source.ts",
     "migration:create": "typeorm-ts-node-commonjs migration:create",
     "migration:revert": "npm run typeorm -- migration:revert -d src/data-source.ts",
     "seed": "ts-node src/database/seeds/runSeed.ts"

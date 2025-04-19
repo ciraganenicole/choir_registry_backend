@@ -36,7 +36,6 @@ export class TransactionController {
 
   @Get()
   async findAll(@Query() filterDto: TransactionFilterDto) {
-    console.log('Received query params:', filterDto);
     try {
       const result = await this.transactionService.findAll(filterDto);
       return result;
