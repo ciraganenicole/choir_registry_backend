@@ -42,6 +42,6 @@ import { initCloudinary } from './config/cloudinary.config';
 })
 export class AppModule implements OnModuleInit {
   onModuleInit() {
-    initCloudinary();
+    // initCloudinary();
   }
 }
