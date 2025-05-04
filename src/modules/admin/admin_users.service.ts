@@ -24,7 +24,7 @@ export class AdminUsersService {
             email: userData.email,
             password: hashedPassword,
             username: userData.username,
-            role: userData.role || AdminRole.CHOIR_ADMIN
+            role: userData.role || AdminRole.ATTENDANCE_ADMIN
         });
 
         return await this.adminUserRepository.save(newUser);

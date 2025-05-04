@@ -255,12 +255,26 @@ export class TransactionService {
     };
   }
 
-  async getStats() {
-    const currentMonthStart = startOfMonth(new Date());
-    const currentMonthEnd = endOfMonth(new Date());
+  async getStats(startDate?: Date, endDate?: Date) {
+    // If no dates provided, default to current month
+    const currentMonthStart = startDate ? startOfMonth(new Date(startDate)) : startOfMonth(new Date());
+    const currentMonthEnd = endDate ? endOfMonth(new Date(endDate)) : endOfMonth(new Date());
 
-    // Get all transactions
-    const transactions = await this.transactionRepository.find();
+    // Get transactions within date range
+    const queryBuilder = this.transactionRepository.createQueryBuilder('transaction');
+    
+    if (startDate) {
+      queryBuilder.andWhere('transaction.transactionDate >= :startDate', { 
+        startDate: new Date(startDate)
+      });
+    }
+    if (endDate) {
+      queryBuilder.andWhere('transaction.transactionDate <= :endDate', { 
+        endDate: new Date(endDate)
+      });
+    }
+
+    const transactions = await queryBuilder.getMany();
 
     // Calculate totals by currency
     const usdTransactions = transactions.filter(t => t.currency === Currency.USD);
@@ -284,7 +298,7 @@ export class TransactionService {
       .filter(t => t.type === TransactionType.EXPENSE)
       .reduce((sum, t) => sum + Number(t.amount), 0);
 
-    // Get current month daily totals
+    // Get daily totals for the period
     const [dailyUsdTotal, dailyFcTotal] = await Promise.all([
       this.transactionRepository
         .createQueryBuilder('transaction')
@@ -311,6 +325,27 @@ export class TransactionService {
         .getRawOne()
     ]);
 
+    // Calculate monthly breakdown
+    const monthlyBreakdown = transactions.reduce((acc, t) => {
+      const date = new Date(t.transactionDate);
+      const monthYear = date.toISOString().slice(0, 7); // Format: YYYY-MM
+      if (!acc[monthYear]) {
+        acc[monthYear] = {
+          usd: { income: 0, expense: 0 },
+          fc: { income: 0, expense: 0 }
+        };
+      }
+      
+      const currency = t.currency === Currency.USD ? 'usd' : 'fc';
+      const type = t.type === TransactionType.INCOME ? 'income' : 'expense';
+      acc[monthYear][currency][type] += Number(t.amount);
+      
+      return acc;
+    }, {} as Record<string, {
+      usd: { income: number; expense: number };
+      fc: { income: number; expense: number };
+    }>);
+
     return {
       usd: {
         totalIncome: usdIncome,
@@ -323,29 +358,13 @@ export class TransactionService {
         totalExpense: fcExpense,
         netRevenue: fcIncome - fcExpense,
         currentMonthDailyTotal: Number(dailyFcTotal?.total || 0)
+      },
+      monthlyBreakdown,
+      dateRange: {
+        from: startDate ? new Date(startDate) : currentMonthStart,
+        to: endDate ? new Date(endDate) : currentMonthEnd
       }
     };
-  }
-
-  private calculateTotal(transactions: Transaction[], type: TransactionType, currency: Currency): number {
-    return transactions
-      .filter(t => t.type === type && t.currency === currency)
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-  }
-
-  private calculateDailyTotal(transactions: Transaction[], currency: Currency): number {
-    return transactions
-      .filter(t => 
-        t.type === TransactionType.INCOME && 
-        t.currency === currency && 
-        t.category === 'DAILY'
-      )
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-  }
-
-  private calculatePercentageChange(current: number, previous: number): number {
-    if (!previous) return 0;
-    return ((current - previous) / Math.abs(previous)) * 100;
   }
 
   async getDailyContributions(filters: DailyContributionFilterDto) {
