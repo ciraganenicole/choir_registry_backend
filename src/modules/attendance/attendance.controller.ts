@@ -8,6 +8,8 @@ import {
     Param, 
     Query, 
     ParseIntPipe,
+    UseGuards,
+    Put
 } from '@nestjs/common';
 import { API_ROUTES } from '../../common/routes/api.routes';
 import { AttendanceService } from './attendance.service';
@@ -24,14 +26,20 @@ import {
     ApiQuery,
     ApiParam 
 } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { AdminRole } from '../admin/admin-role.enum';
 
 @ApiTags('Attendance')
 @ApiBearerAuth()
 @Controller('attendance')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AttendanceController {
     constructor(private readonly attendanceService: AttendanceService) {}
 
     @Post()
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Create a new attendance record' })
     @ApiResponse({ status: 201, description: 'Attendance record created successfully' })
     create(@Body() createAttendanceDto: CreateAttendanceDto) {
@@ -39,12 +47,14 @@ export class AttendanceController {
     }
 
     @Get()
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Get all attendance records with filters' })
     findAll(@Query() filterDto: AttendanceFilterDto) {
         return this.attendanceService.findAll(filterDto);
     }
 
     @Get('user/:userId')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Get attendance records for a specific user' })
     findByUser(
         @Param('userId', ParseIntPipe) userId: number,
@@ -54,12 +64,14 @@ export class AttendanceController {
     }
 
     @Get(':id')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Get a specific attendance record' })
     findOne(@Param('id', ParseIntPipe) id: number) {
         return this.attendanceService.findOne(id);
     }
 
-    @Patch(':id')
+    @Put(':id')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Update an attendance record' })
     update(
         @Param('id', ParseIntPipe) id: number,
@@ -69,18 +81,21 @@ export class AttendanceController {
     }
 
     @Delete(':id')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Delete an attendance record' })
     remove(@Param('id', ParseIntPipe) id: number) {
         return this.attendanceService.remove(id);
     }
 
     @Post('manual')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Mark attendance manually' })
     markManualAttendance(@Body() createAttendanceDto: CreateAttendanceDto) {
         return this.attendanceService.markManualAttendance(createAttendanceDto);
     }
 
     @Patch(':id/justify')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Justify an absence with a specific reason' })
     @ApiResponse({ status: 200, description: 'Absence justified successfully' })
     @ApiResponse({ status: 400, description: 'Cannot justify absence for a user on leave' })
@@ -92,6 +107,7 @@ export class AttendanceController {
     }
 
     @Get('stats/user/:userId')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Get attendance statistics for a specific user' })
     async getUserStats(
         @Param('userId', ParseIntPipe) userId: number,
@@ -102,6 +118,7 @@ export class AttendanceController {
     }
 
     @Get('stats/overall')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Get overall attendance statistics' })
     async getOverallStats(
         @Query('startDate') startDate: Date,

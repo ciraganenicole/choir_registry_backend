@@ -11,6 +11,8 @@ import { v2 as cloudinary } from 'cloudinary';
 import { Transaction } from '../transactions/transaction.entity';
 import { ConfigService } from '@nestjs/config';
 import { TransactionType } from '../transactions/enums/transactions-categories.enum';
+import { SyncService } from '../sync/sync.service';
+import { SyncEntityType, SyncOperation } from '../sync/sync.entity';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -21,7 +23,8 @@ export class UsersService implements OnModuleInit {
         private readonly userRepository: Repository<User>,
         @InjectRepository(Transaction)
         private readonly transactionRepository: Repository<Transaction>,
-        private readonly configService: ConfigService
+        private readonly configService: ConfigService,
+        private readonly syncService: SyncService
     ) {}
 
     onModuleInit() {
@@ -82,7 +85,8 @@ export class UsersService implements OnModuleInit {
             profession, 
             commune, 
             commission, 
-            category, 
+            category,
+            isActive, 
             page = 1, 
             limit = 8, 
             sortBy = 'firstName', 
@@ -126,6 +130,10 @@ export class UsersService implements OnModuleInit {
 
         if (category) {
             query.andWhere(':category = ANY(user.categories)', { category });
+        }
+
+        if (isActive !== undefined && isActive !== null) {
+            query.andWhere('user.isActive = :isActive', { isActive: Boolean(isActive) });
         }
 
         if (letter) {
@@ -207,6 +215,15 @@ export class UsersService implements OnModuleInit {
             }
 
             await queryRunner.commitTransaction();
+
+            // Log the change for sync
+            await this.syncService.logChange(
+                SyncEntityType.USER,
+                savedUser.id,
+                SyncOperation.CREATE,
+                savedUser
+            );
+
             return savedUser;
         } catch (error) {
             await queryRunner.rollbackTransaction();
@@ -218,13 +235,35 @@ export class UsersService implements OnModuleInit {
 
     async updateUser(id: number, userData: UpdateUserDto): Promise<User> {
         const user = await this.findById(id);
+        const oldData = { ...user };
         Object.assign(user, userData);
-        return this.userRepository.save(user);
+        const updatedUser = await this.userRepository.save(user);
+
+        // Log the change for sync
+        // await this.syncService.logChange(
+        //     SyncEntityType.USER,
+        //     updatedUser.id,
+        //     SyncOperation.UPDATE,
+        //     {
+        //         old: oldData,
+        //         new: updatedUser
+        //     }
+        // );
+
+        return updatedUser;
     }
 
     async deleteUser(id: number): Promise<void> {
         const user = await this.findById(id);
         await this.userRepository.remove(user);
+
+        // Log the change for sync
+        await this.syncService.logChange(
+            SyncEntityType.USER,
+            id,
+            SyncOperation.DELETE,
+            { deletedUser: user }
+        );
     }
 
     async getUsersByCategory(category: UserCategory): Promise<User[]> {
@@ -324,13 +363,25 @@ export class UsersService implements OnModuleInit {
         return user || undefined;
     }
 
-    async getUserContributionStats(userId: number): Promise<any> {
-        const transactions = await this.transactionRepository.find({
-            where: {
-                contributorId: userId,
-                type: TransactionType.INCOME
-            }
-        });
+    async getUserContributionStats(userId: number, startDate?: Date, endDate?: Date): Promise<any> {
+        const queryBuilder = this.transactionRepository
+            .createQueryBuilder('transaction')
+            .where('transaction.contributorId = :userId', { userId })
+            .andWhere('transaction.type = :type', { type: TransactionType.INCOME });
+
+        // Add date filtering if dates are provided
+        if (startDate) {
+            queryBuilder.andWhere('transaction.transactionDate >= :startDate', { 
+                startDate: new Date(startDate) 
+            });
+        }
+        if (endDate) {
+            queryBuilder.andWhere('transaction.transactionDate <= :endDate', { 
+                endDate: new Date(endDate) 
+            });
+        }
+
+        const transactions = await queryBuilder.getMany();
 
         const totalContributions = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
         const contributionsByCategory = transactions.reduce((acc, t) => {
@@ -338,10 +389,25 @@ export class UsersService implements OnModuleInit {
             return acc;
         }, {} as Record<string, number>);
 
+        // Add monthly breakdown if date range is provided
+        let monthlyBreakdown = {};
+        if (startDate && endDate) {
+            monthlyBreakdown = transactions.reduce((acc, t) => {
+                const monthYear = t.transactionDate.toISOString().slice(0, 7); // Format: YYYY-MM
+                acc[monthYear] = (acc[monthYear] || 0) + Number(t.amount);
+                return acc;
+            }, {} as Record<string, number>);
+        }
+
         return {
             totalContributions,
             contributionsByCategory,
-            transactionCount: transactions.length
+            monthlyBreakdown,
+            transactionCount: transactions.length,
+            dateRange: {
+                from: startDate ? new Date(startDate) : null,
+                to: endDate ? new Date(endDate) : null
+            }
         };
     }
 
