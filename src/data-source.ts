@@ -14,8 +14,8 @@ const getConnectionUrl = () => {
   const password = encodeURIComponent(process.env.DB_PASSWORD || 'your_password');
   const database = process.env.DB_DATABASE || 'choir_registry';
   
-  // Use Render's internal connection format with encoded password
-  const url = `postgresql://${username}:${password}@${host}:${port}/${database}?sslmode=require`;
+  // Use sslmode=disable for local development
+  const url = `postgresql://${username}:${password}@${host}:${port}/${database}?sslmode=disable`;
   console.log('Attempting to connect to database with host:', host);
   return url;
 };
