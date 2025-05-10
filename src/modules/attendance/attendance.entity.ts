@@ -58,7 +58,7 @@ export class Attendance {
     eventType: AttendanceEventType;
 
     @Column({ type: 'date' })
-    date: Date;
+    date: string;
 
     @Column({ type: 'time', nullable: true }) // Nullable for absentees
     timeIn?: string;

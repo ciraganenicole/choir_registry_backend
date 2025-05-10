@@ -42,8 +42,8 @@ interface GroupedAttendanceStats {
 }
 
 interface QueryParams {
-    startDate?: Date;
-    endDate?: Date;
+    startDate?: Date | string;
+    endDate?: Date | string;
     userId?: number;
     eventType?: string;
     status?: string;
@@ -62,9 +62,10 @@ export class AttendanceService {
   async create(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
     const { date, eventType, ...rest } = createAttendanceDto;
 
-    // Format the date
-    const formattedDate = new Date(date);
-    formattedDate.setHours(0, 0, 0, 0);
+    // Format the date as YYYY-MM-DD string
+    const formattedDate = typeof date === 'string' 
+      ? date.split('T')[0]  // If it's already a string, just take the date part
+      : new Date(date as Date).toISOString().split('T')[0];  // If it's a Date object, convert to YYYY-MM-DD
 
     // Create the attendance record
     const attendance = new Attendance();
@@ -174,8 +175,9 @@ export class AttendanceService {
     
     let formattedDate = attendance.date;
     if (date) {
-      formattedDate = new Date(date);
-      formattedDate.setHours(0, 0, 0, 0);
+      formattedDate = typeof date === 'string'
+        ? date.split('T')[0]  // If it's already a string, just take the date part
+        : new Date(date as Date).toISOString().split('T')[0];  // If it's a Date object, convert to YYYY-MM-DD
     }
 
     if (rest.userId) {
@@ -216,13 +218,20 @@ export class AttendanceService {
     return this.attendanceRepository.save(attendance);
   }
 
-  async getUserAttendanceStats(userId: number, startDate: Date, endDate: Date): Promise<AttendanceStats> {
+  async getUserAttendanceStats(userId: number, startDate: Date | string, endDate: Date | string): Promise<AttendanceStats> {
+    const startDateStr = typeof startDate === 'string' 
+      ? startDate.split('T')[0]
+      : new Date(startDate).toISOString().split('T')[0];
+    const endDateStr = typeof endDate === 'string'
+      ? endDate.split('T')[0]
+      : new Date(endDate).toISOString().split('T')[0];
+
     const attendances = await this.attendanceRepository
       .createQueryBuilder('attendance')
       .where('attendance.userId = :userId', { userId })
       .andWhere('attendance.date BETWEEN :startDate AND :endDate', {
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0]
+        startDate: startDateStr,
+        endDate: endDateStr
       })
       .getMany();
 
@@ -240,7 +249,14 @@ export class AttendanceService {
     };
   }
 
-  async getAttendanceStats(startDate: Date, endDate: Date): Promise<GroupedAttendanceStats> {
+  async getAttendanceStats(startDate: Date | string, endDate: Date | string): Promise<GroupedAttendanceStats> {
+    const startDateStr = typeof startDate === 'string'
+      ? startDate.split('T')[0]
+      : new Date(startDate).toISOString().split('T')[0];
+    const endDateStr = typeof endDate === 'string'
+      ? endDate.split('T')[0]
+      : new Date(endDate).toISOString().split('T')[0];
+
     const results = await this.attendanceRepository
       .createQueryBuilder('attendance')
       .select([
@@ -250,8 +266,8 @@ export class AttendanceService {
         'COUNT(*) as count'
       ])
       .where('attendance.date BETWEEN :startDate AND :endDate', { 
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0]
+        startDate: startDateStr,
+        endDate: endDateStr
       })
       .groupBy('attendance.date')
       .addGroupBy('attendance.eventType')
@@ -309,13 +325,20 @@ export class AttendanceService {
     return stats;
   }
 
-  async findByDateRange(startDate: Date, endDate: Date): Promise<Attendance[]> {
+  async findByDateRange(startDate: Date | string, endDate: Date | string): Promise<Attendance[]> {
+    const startDateStr = typeof startDate === 'string'
+      ? startDate.split('T')[0]
+      : new Date(startDate).toISOString().split('T')[0];
+    const endDateStr = typeof endDate === 'string'
+      ? endDate.split('T')[0]
+      : new Date(endDate).toISOString().split('T')[0];
+
     return this.attendanceRepository
       .createQueryBuilder('attendance')
       .leftJoinAndSelect('attendance.user', 'user')
       .where('attendance.date BETWEEN :startDate AND :endDate', {
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0]
+        startDate: startDateStr,
+        endDate: endDateStr
       })
       .orderBy('attendance.date', 'DESC')
       .addOrderBy('attendance.timeIn', 'ASC')
@@ -324,16 +347,23 @@ export class AttendanceService {
 
   async findByUserAndDateRange(
     userId: number,
-    startDate: Date,
-    endDate: Date
+    startDate: Date | string,
+    endDate: Date | string
   ): Promise<Attendance[]> {
+    const startDateStr = typeof startDate === 'string'
+      ? startDate.split('T')[0]
+      : new Date(startDate).toISOString().split('T')[0];
+    const endDateStr = typeof endDate === 'string'
+      ? endDate.split('T')[0]
+      : new Date(endDate).toISOString().split('T')[0];
+
     return this.attendanceRepository
       .createQueryBuilder('attendance')
       .leftJoinAndSelect('attendance.user', 'user')
       .where('attendance.userId = :userId', { userId })
       .andWhere('attendance.date BETWEEN :startDate AND :endDate', {
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0]
+        startDate: startDateStr,
+        endDate: endDateStr
       })
       .orderBy('attendance.date', 'DESC')
       .addOrderBy('attendance.timeIn', 'ASC')

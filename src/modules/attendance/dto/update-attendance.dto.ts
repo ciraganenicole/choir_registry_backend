@@ -20,7 +20,7 @@ export class UpdateAttendanceDto extends PartialType(CreateAttendanceDto) {
     @IsOptional()
     @Type(() => Date)
     @IsDate()
-    date?: Date;
+    date?: Date | string;
 
     @IsOptional()
     @IsString()
