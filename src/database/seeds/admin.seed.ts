@@ -5,23 +5,25 @@ import { AdminRole } from '../../modules/admin/admin-role.enum';
 
 export const adminSeeder = async (dataSource: DataSource) => {
   const adminRepository = dataSource.getRepository(AdminUser);
-  const hashedPassword = await bcrypt.hash('password123', 10);
 
   const admins = [
     {
-      email: 'superadmin@example.com',
+      email: 'admin@gmail.com',
       username: 'Super Admin',
       role: AdminRole.SUPER_ADMIN,
+      password: 'admin2025'
     },
-      {
-        email: 'adminattendance@example.com',
-        username: 'Attendance Admin',
-        role: AdminRole.ATTENDANCE_ADMIN,
-      },
     {
-      email: 'adminfinance@example.com',
+      email: 'registre@gmail.com',
+      username: 'Attendance Admin',
+      role: AdminRole.ATTENDANCE_ADMIN,
+      password: 'registre2025'
+    },
+    {
+      email: 'finance@gmail.com',
       username: 'Finance Admin',
       role: AdminRole.FINANCE_ADMIN,
+      password: 'finance2025'
     },
   ];
 
@@ -35,6 +37,7 @@ export const adminSeeder = async (dataSource: DataSource) => {
 
       if (!existingAdmin) {
         console.log(`Creating admin: ${adminData.email}`);
+        const hashedPassword = await bcrypt.hash(adminData.password, 10);
         const admin = adminRepository.create({
           ...adminData,
           password: hashedPassword,

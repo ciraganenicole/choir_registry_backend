@@ -1,6 +1,5 @@
 import { AppDataSource } from '../../data-source';
 import { adminSeeder } from './admin.seed';
-import { userSeeder } from './user.seed';
 import { TransactionSeeder } from './transaction.seed';
 import { seedAttendance } from './attendance.seed';
 import { DataSource } from 'typeorm';
@@ -20,9 +19,7 @@ const runSeed = async () => {
     // Run seeds
     console.log('🌱 Starting seeding...');
     // await adminSeeder(AppDataSource);
-    // await userSeeder(AppDataSource);
     // await new TransactionSeeder().run(AppDataSource);
-    // await seedEvents(AppDataSource);
     await seedAttendance(AppDataSource);
     // await seedUsers(AppDataSource);
     console.log('🎉 Seeding completed successfully!');

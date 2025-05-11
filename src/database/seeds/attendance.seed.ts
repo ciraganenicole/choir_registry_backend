@@ -67,7 +67,11 @@ export const seedAttendance = async (dataSource: DataSource): Promise<void> => {
         const records = await new Promise<AttendanceRecord[]>((resolve, reject) => {
             csv.parse(fileContent, {
                 columns: true,
-                skip_empty_lines: true
+                skip_empty_lines: true,
+                trim: true,
+                relax_column_count: true, // Allow varying number of columns
+                delimiter: ',',
+                from_line: 1
             }, (err, records) => {
                 if (err) reject(err);
                 else resolve(records as AttendanceRecord[]);
