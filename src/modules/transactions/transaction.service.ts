@@ -22,6 +22,11 @@ export class TransactionService {
   async create(createTransactionDto: CreateTransactionDto): Promise<Transaction> {
     const transaction = new Transaction();
     
+    // Format the date as YYYY-MM-DD string
+    const formattedDate = typeof createTransactionDto.transactionDate === 'string' 
+      ? createTransactionDto.transactionDate.split('T')[0]  // If it's already a string, just take the date part
+      : new Date(createTransactionDto.transactionDate as Date).toISOString().split('T')[0];  // If it's a Date object, convert to YYYY-MM-DD
+    
     // Copy basic fields
     Object.assign(transaction, {
       amount: createTransactionDto.amount,
@@ -29,7 +34,7 @@ export class TransactionService {
       category: createTransactionDto.category,
       subcategory: createTransactionDto.subcategory,
       description: createTransactionDto.description,
-      transactionDate: createTransactionDto.transactionDate,
+      transactionDate: formattedDate,
       currency: createTransactionDto.currency || Currency.USD
     });
 
@@ -64,9 +69,16 @@ export class TransactionService {
       .leftJoinAndSelect('transaction.contributor', 'contributor');
 
     if (startDate && endDate) {
+      const startDateStr = typeof startDate === 'string' 
+        ? startDate.split('T')[0]
+        : new Date(startDate).toISOString().split('T')[0];
+      const endDateStr = typeof endDate === 'string'
+        ? endDate.split('T')[0]
+        : new Date(endDate).toISOString().split('T')[0];
+
       queryBuilder.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-        startDate,
-        endDate,
+        startDate: startDateStr,
+        endDate: endDateStr,
       });
     }
 
@@ -111,9 +123,6 @@ export class TransactionService {
     // Ensure amounts are numbers without changing the entity structure
     transactions.forEach(transaction => {
       transaction.amount = Number(transaction.amount) || 0;
-      if (!(transaction.transactionDate instanceof Date)) {
-        transaction.transactionDate = new Date(transaction.transactionDate);
-      }
     });
 
     return {
@@ -137,7 +146,15 @@ export class TransactionService {
 
   async update(id: number, updateTransactionDto: UpdateTransactionDto): Promise<Transaction> {
     const transaction = await this.findOne(id);
-    const { externalContributorName, contributorId, ...rest } = updateTransactionDto as CreateTransactionDto;
+    const { externalContributorName, contributorId, transactionDate, ...rest } = updateTransactionDto as CreateTransactionDto;
+
+    // Format the date if provided
+    let formattedDate = transaction.transactionDate;
+    if (transactionDate) {
+      formattedDate = typeof transactionDate === 'string'
+        ? transactionDate.split('T')[0]  // If it's already a string, just take the date part
+        : new Date(transactionDate as Date).toISOString().split('T')[0];  // If it's a Date object, convert to YYYY-MM-DD
+    }
 
     // Handle contributor updates
     if (externalContributorName) {
@@ -154,7 +171,10 @@ export class TransactionService {
       transaction.contributorId = user.id;
     }
 
-    Object.assign(transaction, rest);
+    Object.assign(transaction, {
+      ...rest,
+      transactionDate: formattedDate
+    });
     return this.transactionRepository.save(transaction);
   }
 
@@ -255,116 +275,236 @@ export class TransactionService {
     };
   }
 
-  async getStats(startDate?: Date, endDate?: Date) {
+  async getStats(startDate?: Date | string, endDate?: Date | string) {
     // If no dates provided, default to current month
-    const currentMonthStart = startDate ? startOfMonth(new Date(startDate)) : startOfMonth(new Date());
-    const currentMonthEnd = endDate ? endOfMonth(new Date(endDate)) : endOfMonth(new Date());
+    const currentMonthStart = startOfMonth(new Date());
+    const currentMonthEnd = endOfMonth(new Date());
 
-    // Get transactions within date range
-    const queryBuilder = this.transactionRepository.createQueryBuilder('transaction');
-    
-    if (startDate) {
-      queryBuilder.andWhere('transaction.transactionDate >= :startDate', { 
-        startDate: new Date(startDate)
-      });
-    }
-    if (endDate) {
-      queryBuilder.andWhere('transaction.transactionDate <= :endDate', { 
-        endDate: new Date(endDate)
-      });
-    }
+    const startDateStr = startDate 
+      ? (typeof startDate === 'string' 
+        ? startDate.split('T')[0]
+        : new Date(startDate).toISOString().split('T')[0])
+      : currentMonthStart.toISOString().split('T')[0];
+    const endDateStr = endDate
+      ? (typeof endDate === 'string'
+        ? endDate.split('T')[0]
+        : new Date(endDate).toISOString().split('T')[0])
+      : currentMonthEnd.toISOString().split('T')[0];
 
-    const transactions = await queryBuilder.getMany();
+    console.log('Date Filter Debug:', {
+      inputStartDate: startDate,
+      inputEndDate: endDate,
+      formattedStartDate: startDateStr,
+      formattedEndDate: endDateStr,
+      currentMonthStart: currentMonthStart.toISOString().split('T')[0],
+      currentMonthEnd: currentMonthEnd.toISOString().split('T')[0]
+    });
+
+    const query = this.transactionRepository.createQueryBuilder('transaction');
+
+    // Use >= for start date and <= for end date since we're working with a date column
+    query.andWhere('transaction.transactionDate >= :startDate', { startDate: startDateStr })
+         .andWhere('transaction.transactionDate <= :endDate', { endDate: endDateStr });
+
+    const transactions = await query.getMany();
+
+    console.log('Query Results:', {
+      totalTransactions: transactions.length,
+      dateRange: transactions.length > 0 ? {
+        earliest: transactions[0].transactionDate,
+        latest: transactions[transactions.length - 1].transactionDate
+      } : 'No transactions found',
+      transactions: transactions.map(t => ({
+        date: t.transactionDate,
+        amount: t.amount,
+        currency: t.currency,
+        type: t.type
+      }))
+    });
 
     // Calculate totals by currency
     const usdTransactions = transactions.filter(t => t.currency === Currency.USD);
     const fcTransactions = transactions.filter(t => t.currency === Currency.FC);
 
-    // USD totals
-    const usdIncome = usdTransactions
-      .filter(t => t.type === TransactionType.INCOME)
-      .reduce((sum, t) => sum + Number(t.amount), 0);
+    console.log('Currency Filtering:', {
+      usdTransactions: usdTransactions.map(t => ({ amount: t.amount, type: t.type })),
+      fcTransactions: fcTransactions.map(t => ({ amount: t.amount, type: t.type }))
+    });
 
-    const usdExpense = usdTransactions
-      .filter(t => t.type === TransactionType.EXPENSE)
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-
-    // FC totals
-    const fcIncome = fcTransactions
-      .filter(t => t.type === TransactionType.INCOME)
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-
-    const fcExpense = fcTransactions
-      .filter(t => t.type === TransactionType.EXPENSE)
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-
-    // Get daily totals for the period
-    const [dailyUsdTotal, dailyFcTotal] = await Promise.all([
-      this.transactionRepository
-        .createQueryBuilder('transaction')
-        .where('transaction.type = :type', { type: TransactionType.INCOME })
-        .andWhere('transaction.category = :category', { category: 'DAILY' })
-        .andWhere('transaction.currency = :currency', { currency: Currency.USD })
-        .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-          startDate: currentMonthStart,
-          endDate: currentMonthEnd,
-        })
-        .select('SUM(transaction.amount)', 'total')
-        .getRawOne(),
-      
-      this.transactionRepository
-        .createQueryBuilder('transaction')
-        .where('transaction.type = :type', { type: TransactionType.INCOME })
-        .andWhere('transaction.category = :category', { category: 'DAILY' })
-        .andWhere('transaction.currency = :currency', { currency: Currency.FC })
-        .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-          startDate: currentMonthStart,
-          endDate: currentMonthEnd,
-        })
-        .select('SUM(transaction.amount)', 'total')
-        .getRawOne()
-    ]);
+    const usdTotal = usdTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const fcTotal = fcTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
     // Calculate monthly breakdown
-    const monthlyBreakdown = transactions.reduce((acc, t) => {
-      const date = new Date(t.transactionDate);
-      const monthYear = date.toISOString().slice(0, 7); // Format: YYYY-MM
-      if (!acc[monthYear]) {
-        acc[monthYear] = {
-          usd: { income: 0, expense: 0 },
-          fc: { income: 0, expense: 0 }
+    const monthlyBreakdown = transactions.reduce((acc, transaction) => {
+      const month = new Date(transaction.transactionDate).toISOString().slice(0, 7); // YYYY-MM
+      if (!acc[month]) {
+        acc[month] = {
+          usd: 0,
+          fc: 0
         };
       }
-      
-      const currency = t.currency === Currency.USD ? 'usd' : 'fc';
-      const type = t.type === TransactionType.INCOME ? 'income' : 'expense';
-      acc[monthYear][currency][type] += Number(t.amount);
-      
+      if (transaction.currency === Currency.USD) {
+        acc[month].usd += Number(transaction.amount);
+      } else {
+        acc[month].fc += Number(transaction.amount);
+      }
       return acc;
-    }, {} as Record<string, {
-      usd: { income: number; expense: number };
-      fc: { income: number; expense: number };
-    }>);
+    }, {} as Record<string, { usd: number; fc: number }>);
+
+    // Calculate daily totals for the current month
+    const currentMonthDailyTotalUSD = usdTransactions
+      .filter(t => {
+        const transactionDate = new Date(t.transactionDate);
+        return transactionDate >= currentMonthStart && transactionDate <= currentMonthEnd;
+      })
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const currentMonthDailyTotalFC = fcTransactions
+      .filter(t => {
+        const transactionDate = new Date(t.transactionDate);
+        return transactionDate >= currentMonthStart && transactionDate <= currentMonthEnd;
+      })
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    console.log('Stats Summary:', {
+      usdTotal,
+      fcTotal,
+      monthlyBreakdown,
+      monthlyBreakdownKeys: Object.keys(monthlyBreakdown),
+      currentMonthDailyTotalUSD,
+      currentMonthDailyTotalFC
+    });
 
     return {
-      usd: {
-        totalIncome: usdIncome,
-        totalExpense: usdExpense,
-        netRevenue: usdIncome - usdExpense,
-        currentMonthDailyTotal: Number(dailyUsdTotal?.total || 0)
-      },
-      fc: {
-        totalIncome: fcIncome,
-        totalExpense: fcExpense,
-        netRevenue: fcIncome - fcExpense,
-        currentMonthDailyTotal: Number(dailyFcTotal?.total || 0)
+      totals: {
+        usd: usdTotal,
+        fc: fcTotal
       },
       monthlyBreakdown,
       dateRange: {
-        from: startDate ? new Date(startDate) : currentMonthStart,
-        to: endDate ? new Date(endDate) : currentMonthEnd
-      }
+        from: new Date(startDateStr),
+        to: new Date(endDateStr)
+      },
+      currentMonthDailyTotalUSD,
+      currentMonthDailyTotalFC
     };
+  }
+
+  private getPeriods(startDate: Date, endDate: Date, groupBy: 'week' | 'month' | 'year'): string[] {
+    const periods: string[] = [];
+    let currentDate = new Date(startDate);
+
+    while (currentDate <= endDate) {
+      periods.push(this.getPeriodKey(currentDate, groupBy));
+      currentDate = this.addPeriod(currentDate, groupBy);
+    }
+
+    return periods;
+  }
+
+  private getPeriodKey(date: Date, groupBy: 'week' | 'month' | 'year'): string {
+    switch (groupBy) {
+      case 'week':
+        return format(date, 'yyyy-[W]ww');
+      case 'month':
+        return format(date, 'yyyy-MM');
+      case 'year':
+        return format(date, 'yyyy');
+      default:
+        return format(date, 'yyyy-MM');
+    }
+  }
+
+  private addPeriod(date: Date, groupBy: 'week' | 'month' | 'year'): Date {
+    const newDate = new Date(date);
+    switch (groupBy) {
+      case 'week':
+        newDate.setDate(newDate.getDate() + 7);
+        break;
+      case 'month':
+        newDate.setMonth(newDate.getMonth() + 1);
+        break;
+      case 'year':
+        newDate.setFullYear(newDate.getFullYear() + 1);
+        break;
+    }
+    return newDate;
+  }
+
+  async getTransactionStats(startDate: Date | string, endDate: Date | string, groupBy: 'week' | 'month' | 'year' = 'month') {
+    const startDateStr = typeof startDate === 'string'
+      ? startDate.split('T')[0]
+      : new Date(startDate).toISOString().split('T')[0];
+    const endDateStr = typeof endDate === 'string'
+      ? endDate.split('T')[0]
+      : new Date(endDate).toISOString().split('T')[0];
+
+    const periods = this.getPeriods(new Date(startDateStr), new Date(endDateStr), groupBy);
+    const stats = new Map<string, {
+      period: string;
+      income: { usd: number; fc: number };
+      expenses: { usd: number; fc: number };
+    }>();
+
+    // Initialize stats for all periods
+    periods.forEach(period => {
+      stats.set(period, {
+        period,
+        income: { usd: 0, fc: 0 },
+        expenses: { usd: 0, fc: 0 }
+      });
+    });
+
+    const query = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.contributor', 'contributor')
+      .where('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+        startDate: startDateStr,
+        endDate: endDateStr
+      });
+
+    const transactions = await query.getMany();
+
+    transactions.forEach(transaction => {
+      const period = this.getPeriodKey(new Date(transaction.transactionDate), groupBy);
+      const stat = stats.get(period);
+      if (stat) {
+        if (transaction.type === TransactionType.INCOME) {
+          if (transaction.currency === Currency.USD) {
+            stat.income.usd += Number(transaction.amount);
+          } else {
+            stat.income.fc += Number(transaction.amount);
+          }
+        } else {
+          if (transaction.currency === Currency.USD) {
+            stat.expenses.usd += Number(transaction.amount);
+          } else {
+            stat.expenses.fc += Number(transaction.amount);
+          }
+        }
+      }
+    });
+
+    return Array.from(stats.values());
+  }
+
+  async getTransactionHistory(userId: number, startDate: Date | string, endDate: Date | string) {
+    const startDateStr = typeof startDate === 'string'
+      ? startDate.split('T')[0]
+      : new Date(startDate).toISOString().split('T')[0];
+    const endDateStr = typeof endDate === 'string'
+      ? endDate.split('T')[0]
+      : new Date(endDate).toISOString().split('T')[0];
+
+    return this.transactionRepository
+      .createQueryBuilder('transaction')
+      .where('transaction.contributorId = :userId', { userId })
+      .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+        startDate: startDateStr,
+        endDate: endDateStr
+      })
+      .orderBy('transaction.transactionDate', 'DESC')
+      .getMany();
   }
 
   async getDailyContributions(filters: DailyContributionFilterDto) {
@@ -464,124 +604,5 @@ export class TransactionService {
       console.error('Error in getDailyContributions:', error);
       throw new BadRequestException('Failed to fetch daily contributions. Please check your input parameters.');
     }
-  }
-
-  private getPeriods(startDate: Date, endDate: Date, groupBy: 'week' | 'month' | 'year'): string[] {
-    const periods: string[] = [];
-    let currentDate = new Date(startDate);
-
-    while (currentDate <= endDate) {
-      periods.push(this.getPeriodKey(currentDate, groupBy));
-      currentDate = this.addPeriod(currentDate, groupBy);
-    }
-
-    return periods;
-  }
-
-  private getPeriodKey(date: Date, groupBy: 'week' | 'month' | 'year'): string {
-    switch (groupBy) {
-      case 'week':
-        return format(date, 'yyyy-Www');
-      case 'month':
-        return format(date, 'yyyy-MM');
-      case 'year':
-        return format(date, 'yyyy');
-      default:
-        return format(date, 'yyyy-MM');
-    }
-  }
-
-  private addPeriod(date: Date, groupBy: 'week' | 'month' | 'year'): Date {
-    const newDate = new Date(date);
-    switch (groupBy) {
-      case 'week':
-        newDate.setDate(newDate.getDate() + 7);
-        break;
-      case 'month':
-        newDate.setMonth(newDate.getMonth() + 1);
-        break;
-      case 'year':
-        newDate.setFullYear(newDate.getFullYear() + 1);
-        break;
-    }
-    return newDate;
-  }
-
-  async getTransactionStats(startDate: Date, endDate: Date, groupBy: 'week' | 'month' | 'year' = 'month') {
-    const periods = this.getPeriods(startDate, endDate, groupBy);
-    const stats = new Map<string, {
-      period: string;
-      totalIncome: number;
-      totalExpense: number;
-      transactions: any[];
-    }>();
-
-    // Initialize periods
-    periods.forEach(period => {
-      stats.set(period, {
-        period,
-        totalIncome: 0,
-        totalExpense: 0,
-        transactions: []
-      });
-    });
-
-    const transactions = await this.transactionRepository
-      .createQueryBuilder('transaction')
-      .leftJoinAndSelect('transaction.contributor', 'contributor')
-      .where('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-        startDate,
-        endDate
-      })
-      .orderBy('transaction.transactionDate', 'ASC')
-      .getMany();
-
-    transactions.forEach(transaction => {
-      const periodKey = this.getPeriodKey(transaction.transactionDate, groupBy);
-      const periodStats = stats.get(periodKey)!;
-
-      if (transaction.type === TransactionType.INCOME) {
-        periodStats.totalIncome += transaction.amount;
-      } else {
-        periodStats.totalExpense += transaction.amount;
-      }
-
-      periodStats.transactions.push({
-        id: transaction.id,
-        amount: transaction.amount,
-        type: transaction.type,
-        category: transaction.category,
-        date: transaction.transactionDate,
-        contributor: transaction.contributorId ? {
-          id: transaction.contributorId,
-          name: `${transaction.externalContributorName}`
-        } : null,
-        description: transaction.description
-      });
-    });
-
-    return Array.from(stats.values());
-  }
-
-  async getTransactionHistory(userId: number, startDate: Date, endDate: Date) {
-    const transactions = await this.transactionRepository
-      .createQueryBuilder('transaction')
-      .leftJoinAndSelect('transaction.contributor', 'contributor')
-      .where('transaction.contributorId = :userId', { userId })
-      .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-        startDate,
-        endDate
-      })
-      .orderBy('transaction.transactionDate', 'DESC')
-      .getMany();
-
-    return transactions.map(transaction => ({
-      id: transaction.id,
-      amount: transaction.amount,
-      type: transaction.type,
-      category: transaction.category,
-      date: transaction.transactionDate,
-      description: transaction.description
-    }));
   }
 } 

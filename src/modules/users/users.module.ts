@@ -4,12 +4,10 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { User } from './user.entity';
 import { Transaction } from '../transactions/transaction.entity';
-import { SyncModule } from '../sync/sync.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Transaction]),
-    SyncModule
+    TypeOrmModule.forFeature([User, Transaction])
   ],
   controllers: [UsersController],
   providers: [UsersService],

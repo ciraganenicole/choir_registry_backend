@@ -27,7 +27,7 @@ export class CreateTransactionDto {
     @IsNotEmpty()
     @Type(() => Date)
     @IsDate()
-    transactionDate: Date;
+    transactionDate: Date | string;
 
     @IsOptional()
     @IsEnum(Currency)

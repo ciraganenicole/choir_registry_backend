@@ -7,12 +7,12 @@ export class TransactionFilterDto {
     @IsOptional()
     @Type(() => Date)
     @IsDate()
-    startDate?: Date;
+    startDate?: Date | string;
 
     @IsOptional()
     @Type(() => Date)
     @IsDate()
-    endDate?: Date;
+    endDate?: Date | string;
 
     @IsOptional()
     @IsEnum(TransactionType)

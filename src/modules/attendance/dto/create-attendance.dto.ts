@@ -27,4 +27,8 @@ export class CreateAttendanceDto {
     @IsOptional()
     @IsEnum(JustificationReason)
     justification?: JustificationReason;
+
+    @IsOptional()
+    @IsString()
+    timeIn?: string;
 } 

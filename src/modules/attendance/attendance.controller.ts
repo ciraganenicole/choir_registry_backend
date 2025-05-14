@@ -30,6 +30,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AdminRole } from '../admin/admin-role.enum';
+import { AttendanceEventType } from './attendance.entity';
+import { AttendanceStatus } from './attendance.entity';
 
 @ApiTags('Attendance')
 @ApiBearerAuth()
@@ -87,11 +89,25 @@ export class AttendanceController {
         return this.attendanceService.remove(id);
     }
 
-    @Post('manual')
+    @Post('mark-all-absent')
     @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
-    @ApiOperation({ summary: 'Mark attendance manually' })
-    markManualAttendance(@Body() createAttendanceDto: CreateAttendanceDto) {
-        return this.attendanceService.markManualAttendance(createAttendanceDto);
+    @ApiOperation({ summary: 'Mark all active users as absent for a specific date' })
+    @ApiResponse({ status: 201, description: 'All users marked as absent successfully' })
+    async markAllUsersAbsent(
+        @Body('date') date: Date,
+        @Body('eventType') eventType: AttendanceEventType
+    ) {
+        await this.attendanceService.markAllUsersAbsent(date, eventType);
+        return { message: 'All users marked as absent successfully' };
+    }
+
+    @Post('mark')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
+    @ApiOperation({ summary: 'Update attendance status for a user (must be marked absent first)' })
+    @ApiResponse({ status: 201, description: 'Attendance status updated successfully' })
+    @ApiResponse({ status: 404, description: 'No attendance record found for this user and date' })
+    async markAttendance(@Body() createAttendanceDto: CreateAttendanceDto) {
+        return this.attendanceService.markAttendance(createAttendanceDto);
     }
 
     @Patch(':id/justify')
@@ -125,5 +141,37 @@ export class AttendanceController {
         @Query('endDate') endDate: Date
     ) {
         return this.attendanceService.getAttendanceStats(startDate, endDate);
+    }
+
+    @Post('mark-remaining-absent')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
+    @ApiOperation({ summary: 'Mark remaining unmarked users as absent for a specific date' })
+    @ApiResponse({ status: 201, description: 'Remaining users marked as absent successfully' })
+    async markRemainingUsersAbsent(
+        @Body('date') date: Date,
+        @Body('eventType') eventType: AttendanceEventType
+    ) {
+        await this.attendanceService.markRemainingUsersAbsent(date, eventType);
+        return { message: 'Remaining users marked as absent successfully' };
+    }
+
+    @Post('manual')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
+    @ApiOperation({ summary: 'Manually mark attendance for a user' })
+    @ApiResponse({ status: 201, description: 'Attendance marked successfully' })
+    async markManualAttendance(@Body() createAttendanceDto: CreateAttendanceDto) {
+        return this.attendanceService.markAttendance(createAttendanceDto);
+    }
+
+    @Post('initialize')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
+    @ApiOperation({ summary: 'Initialize attendance records for all active users' })
+    @ApiResponse({ status: 201, description: 'Attendance records initialized successfully' })
+    async initializeAttendance(
+        @Body('date') date: Date | string,
+        @Body('eventType') eventType: AttendanceEventType,
+        @Body('status') status: AttendanceStatus = AttendanceStatus.ABSENT
+    ) {
+        return this.attendanceService.initializeAttendance(date, eventType, status);
     }
 }

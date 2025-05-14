@@ -197,7 +197,7 @@ export class TransactionSeeder implements Seeder {
         transactionDate: new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000)
       }));
 
-      await transactionRepository.save([...transactions, ...pastTransactions]);
+      // await transactionRepository.save([...transactions, ...pastTransactions]);
       console.log('Transaction seeding completed successfully');
     } catch (error) {
       console.error('Error seeding transactions:', error);

@@ -59,7 +59,7 @@ export class Transaction {
   description?: string;
 
   @Column({ type: 'date' })
-  transactionDate: Date;
+  transactionDate: string;
 
   @Column({ nullable: true })
   externalContributorName?: string;

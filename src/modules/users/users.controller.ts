@@ -13,7 +13,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -70,6 +70,17 @@ export class UsersController {
     @Body() userData: UpdateUserDto
   ): Promise<User> {
     return this.usersService.updateUser(id, userData);
+  }
+
+  @Put(API_ROUTES.USERS.BY_ID + '/status')
+  @Roles(AdminRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Toggle user active status' })
+  @ApiResponse({ status: 200, description: 'User status updated successfully' })
+  async toggleUserStatus(
+    @Param('id', ParseIntPipe) id: number
+  ): Promise<User> {
+    const user = await this.usersService.findById(id);
+    return this.usersService.updateUser(id, { isActive: !user.isActive });
   }
 
   @Delete(API_ROUTES.USERS.BY_ID)

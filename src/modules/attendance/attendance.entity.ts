@@ -31,6 +31,7 @@ export enum AttendanceEventType {
 
 export enum JustificationReason {
     ILLNESS = 'ILLNESS',
+    BIRTH = 'BIRTH',
     WORK = 'WORK',
     TRAVEL = 'TRAVEL',
     FAMILY_EMERGENCY = 'FAMILY_EMERGENCY',

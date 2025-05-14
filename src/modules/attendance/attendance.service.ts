@@ -205,11 +205,94 @@ export class AttendanceService {
     }
   }
 
-  async markManualAttendance(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
-    return this.create({
-      ...createAttendanceDto,
-      type: AttendanceType.MANUAL,
+  async markAllUsersAbsent(date: Date | string, eventType: AttendanceEventType): Promise<void> {
+    // Format the date as YYYY-MM-DD string
+    const formattedDate = typeof date === 'string' 
+      ? date.split('T')[0]
+      : new Date(date as Date).toISOString().split('T')[0];
+
+    // Get all active users
+    const users = await this.userRepository.find({
+      where: { isActive: true }
     });
+
+    // Create attendance records for all users
+    const attendanceRecords = users.map(user => {
+      const attendance = new Attendance();
+      Object.assign(attendance, {
+        userId: user.id,
+        date: formattedDate,
+        eventType,
+        status: AttendanceStatus.ABSENT,
+        type: AttendanceType.MANUAL
+      });
+      return attendance;
+    });
+
+    // Save all records
+    await this.attendanceRepository.save(attendanceRecords);
+  }
+
+  async markAttendance(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
+    const { userId, date, eventType, status, timeIn, justification } = createAttendanceDto;
+
+    // Format the date as YYYY-MM-DD string
+    const formattedDate = typeof date === 'string' 
+      ? date.split('T')[0]  // If it's already a string, just take the date part
+      : new Date(date as Date).toISOString().split('T')[0];  // If it's a Date object, convert to YYYY-MM-DD
+
+    // Check if any attendance records exist for this date
+    const existingAttendance = await this.attendanceRepository.find({
+      where: {
+        date: formattedDate,
+        eventType
+      }
+    });
+
+    // If no records exist, initialize all users as absent
+    if (existingAttendance.length === 0) {
+      await this.initializeAttendance(formattedDate, eventType);
+    }
+
+    // Check if attendance record exists for this user
+    let attendance = await this.findAttendanceByUserAndDate(userId, new Date(formattedDate));
+
+    if (!attendance) {
+      // Create new attendance record
+      attendance = new Attendance();
+      attendance.userId = userId;
+      attendance.date = formattedDate;
+      attendance.eventType = eventType;
+      attendance.status = status;
+      attendance.type = AttendanceType.MANUAL;
+      
+      // Set timeIn if provided
+      if (timeIn) {
+        attendance.timeIn = timeIn;
+      }
+
+      // Set justification if provided
+      if (justification) {
+        attendance.justification = justification;
+      }
+
+      return this.attendanceRepository.save(attendance);
+    }
+
+    // Update existing attendance record
+    attendance.status = status;
+    
+    // Update timeIn if provided
+    if (timeIn) {
+      attendance.timeIn = timeIn;
+    }
+
+    // Update justification if provided
+    if (justification) {
+      attendance.justification = justification;
+    }
+
+    return this.attendanceRepository.save(attendance);
   }
 
   async justifyAbsence(id: number, justification: JustificationReason): Promise<Attendance> {
@@ -368,5 +451,89 @@ export class AttendanceService {
       .orderBy('attendance.date', 'DESC')
       .addOrderBy('attendance.timeIn', 'ASC')
       .getMany();
+  }
+
+  async markRemainingUsersAbsent(date: Date | string, eventType: AttendanceEventType): Promise<void> {
+    // Format the date as YYYY-MM-DD string
+    const formattedDate = typeof date === 'string' 
+      ? date.split('T')[0]
+      : new Date(date as Date).toISOString().split('T')[0];
+
+    // Get all active users
+    const users = await this.userRepository.find({
+      where: { isActive: true }
+    });
+
+    // Get existing attendance records for this date
+    const existingAttendance = await this.attendanceRepository.find({
+      where: {
+        date: formattedDate,
+        eventType
+      }
+    });
+
+    // Get IDs of users who already have attendance records
+    const markedUserIds = new Set(existingAttendance.map(a => a.userId));
+
+    // Create attendance records only for users who haven't been marked yet
+    const attendanceRecords = users
+      .filter(user => !markedUserIds.has(user.id))
+      .map(user => {
+        const attendance = new Attendance();
+        Object.assign(attendance, {
+          userId: user.id,
+          date: formattedDate,
+          eventType,
+          status: AttendanceStatus.ABSENT,
+          type: AttendanceType.MANUAL
+        });
+        return attendance;
+      });
+
+    // Save new records if there are any
+    if (attendanceRecords.length > 0) {
+      await this.attendanceRepository.save(attendanceRecords);
+    }
+  }
+
+  async initializeAttendance(date: Date | string, eventType: AttendanceEventType, status: AttendanceStatus = AttendanceStatus.ABSENT): Promise<Attendance[]> {
+    // Format the date as YYYY-MM-DD string
+    const formattedDate = typeof date === 'string' 
+      ? date.split('T')[0]
+      : new Date(date as Date).toISOString().split('T')[0];
+
+    // Check if any attendance records exist for this date
+    const existingAttendance = await this.attendanceRepository.find({
+      where: {
+        date: formattedDate,
+        eventType
+      }
+    });
+
+    // If records exist, return them
+    if (existingAttendance.length > 0) {
+      return existingAttendance;
+    }
+
+    // Get all active users
+    const users = await this.userRepository.find({
+      where: { isActive: true }
+    });
+
+    // Create attendance records for all users
+    const attendanceRecords = users.map(user => {
+      const attendance = new Attendance();
+      Object.assign(attendance, {
+        userId: user.id,
+        date: formattedDate,
+        eventType,
+        status,
+        type: AttendanceType.MANUAL
+      });
+      return attendance;
+    });
+
+    // Save all records
+    return this.attendanceRepository.save(attendanceRecords);
   }
 }

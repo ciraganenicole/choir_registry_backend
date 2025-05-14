@@ -11,8 +11,6 @@ import { v2 as cloudinary } from 'cloudinary';
 import { Transaction } from '../transactions/transaction.entity';
 import { ConfigService } from '@nestjs/config';
 import { TransactionType } from '../transactions/enums/transactions-categories.enum';
-import { SyncService } from '../sync/sync.service';
-import { SyncEntityType, SyncOperation } from '../sync/sync.entity';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -23,8 +21,7 @@ export class UsersService implements OnModuleInit {
         private readonly userRepository: Repository<User>,
         @InjectRepository(Transaction)
         private readonly transactionRepository: Repository<Transaction>,
-        private readonly configService: ConfigService,
-        private readonly syncService: SyncService
+        private readonly configService: ConfigService
     ) {}
 
     onModuleInit() {
@@ -89,7 +86,7 @@ export class UsersService implements OnModuleInit {
             isActive, 
             page = 1, 
             limit = 8, 
-            sortBy = 'firstName', 
+            sortBy = 'lastName', 
             order = 'ASC', 
             letter 
         } = filterDto;
@@ -200,10 +197,16 @@ export class UsersService implements OnModuleInit {
 
     async createUser(userData: CreateUserDto): Promise<User> {
         const queryRunner = this.userRepository.manager.connection.createQueryRunner();
-        await queryRunner.connect();
-        await queryRunner.startTransaction();
-
+        
         try {
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
+            // Set isActive to false if user is a NEWCOMER
+            if (userData.categories?.includes(UserCategory.NEWCOMER)) {
+                userData.isActive = false;
+            }
+
             const user = this.userRepository.create(userData);
             const savedUser = await queryRunner.manager.save(user);
             
@@ -215,18 +218,11 @@ export class UsersService implements OnModuleInit {
             }
 
             await queryRunner.commitTransaction();
-
-            // Log the change for sync
-            await this.syncService.logChange(
-                SyncEntityType.USER,
-                savedUser.id,
-                SyncOperation.CREATE,
-                savedUser
-            );
-
             return savedUser;
         } catch (error) {
-            await queryRunner.rollbackTransaction();
+            if (queryRunner.isTransactionActive) {
+                await queryRunner.rollbackTransaction();
+            }
             throw error;
         } finally {
             await queryRunner.release();
@@ -239,31 +235,12 @@ export class UsersService implements OnModuleInit {
         Object.assign(user, userData);
         const updatedUser = await this.userRepository.save(user);
 
-        // Log the change for sync
-        // await this.syncService.logChange(
-        //     SyncEntityType.USER,
-        //     updatedUser.id,
-        //     SyncOperation.UPDATE,
-        //     {
-        //         old: oldData,
-        //         new: updatedUser
-        //     }
-        // );
-
         return updatedUser;
     }
 
     async deleteUser(id: number): Promise<void> {
         const user = await this.findById(id);
         await this.userRepository.remove(user);
-
-        // Log the change for sync
-        await this.syncService.logChange(
-            SyncEntityType.USER,
-            id,
-            SyncOperation.DELETE,
-            { deletedUser: user }
-        );
     }
 
     async getUsersByCategory(category: UserCategory): Promise<User[]> {
@@ -393,7 +370,7 @@ export class UsersService implements OnModuleInit {
         let monthlyBreakdown = {};
         if (startDate && endDate) {
             monthlyBreakdown = transactions.reduce((acc, t) => {
-                const monthYear = t.transactionDate.toISOString().slice(0, 7); // Format: YYYY-MM
+                const monthYear = t.transactionDate.toString().slice(0, 7); // Format: YYYY-MM
                 acc[monthYear] = (acc[monthYear] || 0) + Number(t.amount);
                 return acc;
             }, {} as Record<string, number>);
