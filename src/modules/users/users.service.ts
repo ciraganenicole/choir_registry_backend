@@ -272,7 +272,7 @@ export class UsersService implements OnModuleInit {
     }
 
     async findAll(filterDto: UserFilterDto): Promise<[User[], number]> {
-        const { page = 1, limit = 10, search, sortBy = 'firstName', order = 'ASC' } = filterDto;
+        const { page = 1, limit = 10, search, sortBy = 'lastName', order = 'ASC' } = filterDto;
         const skip = (page - 1) * limit;
 
         const queryBuilder = this.userRepository
