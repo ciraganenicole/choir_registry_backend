@@ -7,6 +7,7 @@ import { UsersService } from '../users/users.service';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { User } from '../users/user.entity';
 import { AttendanceFilterDto } from './dto/attendance-filter.dto';
+import { UserCategory } from '../users/enums/user-category.enum';
 
 interface AttendancePaginationOptions {
   page?: number;
@@ -211,10 +212,13 @@ export class AttendanceService {
       ? date.split('T')[0]
       : new Date(date as Date).toISOString().split('T')[0];
 
-    // Get all active users
-    const users = await this.userRepository.find({
-      where: { isActive: true }
-    });
+    // Get all active users and inactive newcomers
+    const users = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.categories', 'categories')
+      .where('user.isActive = :isActive', { isActive: true })
+      .orWhere('categories.name = :newcomer', { newcomer: UserCategory.NEWCOMER })
+      .getMany();
 
     // Create attendance records for all users
     const attendanceRecords = users.map(user => {
@@ -235,6 +239,22 @@ export class AttendanceService {
 
   async markAttendance(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
     const { userId, date, eventType, status, timeIn, justification } = createAttendanceDto;
+
+    // Check if user exists
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['categories'] // Add this to get user categories
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Check if user is active or is a newcomer
+    const isNewcomer = user.categories?.includes(UserCategory.NEWCOMER);
+    if (!user.isActive && !isNewcomer) {
+      throw new BadRequestException(`Cannot mark attendance for inactive user with ID ${userId} who is not a newcomer`);
+    }
 
     // Format the date as YYYY-MM-DD string
     const formattedDate = typeof date === 'string' 
@@ -515,10 +535,13 @@ export class AttendanceService {
       return existingAttendance;
     }
 
-    // Get all active users
-    const users = await this.userRepository.find({
-      where: { isActive: true }
-    });
+    // Get all active users and inactive newcomers
+    const users = await this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.categories', 'categories')
+      .where('user.isActive = :isActive', { isActive: true })
+      .orWhere('categories.name = :newcomer', { newcomer: UserCategory.NEWCOMER })
+      .getMany();
 
     // Create attendance records for all users
     const attendanceRecords = users.map(user => {

@@ -351,28 +351,17 @@ export class TransactionService {
       return acc;
     }, {} as Record<string, { usd: number; fc: number }>);
 
-    // Calculate daily totals for the current month
-    const currentMonthDailyTotalUSD = usdTransactions
-      .filter(t => {
-        const transactionDate = new Date(t.transactionDate);
-        return transactionDate >= currentMonthStart && transactionDate <= currentMonthEnd;
-      })
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-
-    const currentMonthDailyTotalFC = fcTransactions
-      .filter(t => {
-        const transactionDate = new Date(t.transactionDate);
-        return transactionDate >= currentMonthStart && transactionDate <= currentMonthEnd;
-      })
-      .reduce((sum, t) => sum + Number(t.amount), 0);
+    // Calculate daily totals using the provided date range
+    const dailyTotalUSD = usdTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const dailyTotalFC = fcTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
     console.log('Stats Summary:', {
       usdTotal,
       fcTotal,
       monthlyBreakdown,
       monthlyBreakdownKeys: Object.keys(monthlyBreakdown),
-      currentMonthDailyTotalUSD,
-      currentMonthDailyTotalFC
+      dailyTotalUSD,
+      dailyTotalFC
     });
 
     return {
@@ -385,8 +374,8 @@ export class TransactionService {
         from: new Date(startDateStr),
         to: new Date(endDateStr)
       },
-      currentMonthDailyTotalUSD,
-      currentMonthDailyTotalFC
+      dailyTotalUSD,
+      dailyTotalFC
     };
   }
 
