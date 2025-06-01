@@ -215,9 +215,10 @@ export class AttendanceService {
     // Get all active users and inactive newcomers
     const users = await this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.categories', 'categories')
-      .where('user.isActive = :isActive', { isActive: true })
-      .orWhere('categories.name = :newcomer', { newcomer: UserCategory.NEWCOMER })
+      .where('(user.isActive = :isActive OR :newcomer = ANY(user.categories))', { 
+        isActive: true, 
+        newcomer: UserCategory.NEWCOMER 
+      })
       .getMany();
 
     // Create attendance records for all users
@@ -242,8 +243,7 @@ export class AttendanceService {
 
     // Check if user exists
     const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['categories'] // Add this to get user categories
+      where: { id: userId }
     });
 
     if (!user) {
@@ -538,9 +538,10 @@ export class AttendanceService {
     // Get all active users and inactive newcomers
     const users = await this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.categories', 'categories')
-      .where('user.isActive = :isActive', { isActive: true })
-      .orWhere('categories.name = :newcomer', { newcomer: UserCategory.NEWCOMER })
+      .where('(user.isActive = :isActive OR :newcomer = ANY(user.categories))', { 
+        isActive: true, 
+        newcomer: UserCategory.NEWCOMER 
+      })
       .getMany();
 
     // Create attendance records for all users

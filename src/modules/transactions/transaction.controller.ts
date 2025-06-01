@@ -122,7 +122,7 @@ export class TransactionController {
   }
 
   @Put(':id')
-  @Roles(AdminRole.FINANCE_ADMIN, AdminRole.SUPER_ADMIN)
+  @Roles(AdminRole.SUPER_ADMIN)
   @UsePipes(new ValidationPipe({ transform: true }))
   async update(
     @Param('id', ParseIntPipe) id: number,
@@ -132,7 +132,7 @@ export class TransactionController {
   }
 
   @Delete(':id')
-  @Roles(AdminRole.FINANCE_ADMIN, AdminRole.SUPER_ADMIN)
+  @Roles(AdminRole.SUPER_ADMIN)
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.transactionService.remove(id);
   }

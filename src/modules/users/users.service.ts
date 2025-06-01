@@ -245,7 +245,9 @@ export class UsersService implements OnModuleInit {
 
     async getUsersByCategory(category: UserCategory): Promise<User[]> {
         return this.userRepository.find({
-            where: { categories: category },
+            where: {
+                categories: In([category])
+            },
             relations: ['attendances', 'transactions'],
             order: {
                 firstName: 'ASC',
@@ -314,12 +316,11 @@ export class UsersService implements OnModuleInit {
     }
 
     async findByCategory(category: string): Promise<User[]> {
-        return this.userRepository.find({
-            where: {
-                categories: In([category])
-            },
-            relations: ['attendances', 'transactions']
-        });
+        return this.userRepository.createQueryBuilder('user')
+            .where(':category = ANY(user.categories)', { category })
+            .leftJoinAndSelect('user.attendances', 'attendance')
+            .leftJoinAndSelect('user.transactions', 'transaction')
+            .getMany();
     }
 
     async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {

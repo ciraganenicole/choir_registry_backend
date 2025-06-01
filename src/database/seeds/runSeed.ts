@@ -18,10 +18,10 @@ const runSeed = async () => {
 
     // Run seeds
     console.log('🌱 Starting seeding...');
-    // await adminSeeder(AppDataSource);
+    //await adminSeeder(AppDataSource);
     // await new TransactionSeeder().run(AppDataSource);
     await seedAttendance(AppDataSource);
-    // await seedUsers(AppDataSource);
+    //await seedUsers(AppDataSource);
     console.log('🎉 Seeding completed successfully!');
 
   } catch (error) {
