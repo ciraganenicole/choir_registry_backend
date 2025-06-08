@@ -18,8 +18,8 @@ export class AttendanceFilterDto {
     endDate?: Date;
 
     @IsOptional()
-    @IsNumber()
-    userId?: number;
+    @IsString()
+    userId?: string;
 
     @IsOptional()
     @IsEnum(AttendanceEventType)

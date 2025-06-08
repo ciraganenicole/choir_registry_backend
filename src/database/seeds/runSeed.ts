@@ -1,6 +1,4 @@
 import { AppDataSource } from '../../data-source';
-import { adminSeeder } from './admin.seed';
-import { TransactionSeeder } from './transaction.seed';
 import { seedAttendance } from './attendance.seed';
 import { DataSource } from 'typeorm';
 import { seedUsers } from './users.seed';

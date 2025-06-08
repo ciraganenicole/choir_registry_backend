@@ -1,5 +1,7 @@
-export enum AdminRole {
+export enum UserRole {
     SUPER_ADMIN = 'SUPER_ADMIN',
+    CHOIR_ADMIN = 'CHOIR_ADMIN',
     ATTENDANCE_ADMIN = 'ATTENDANCE_ADMIN',
     FINANCE_ADMIN = 'FINANCE_ADMIN',
+    CHOIR_MEMBER = 'CHOIR_MEMBER',
 } 

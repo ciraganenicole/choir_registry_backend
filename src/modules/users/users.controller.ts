@@ -25,7 +25,7 @@ import { Transaction } from '../transactions/transaction.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { AdminRole } from '../admin/admin-role.enum';
+import { UserRole } from './enums/role.enum';
 
 @ApiTags('Users')
 @Controller()
@@ -34,7 +34,7 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get(API_ROUTES.USERS.BASE)
-  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ATTENDANCE_ADMIN, AdminRole.FINANCE_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.CHOIR_ADMIN, UserRole.ATTENDANCE_ADMIN, UserRole.FINANCE_ADMIN)
   @ApiOperation({ summary: 'Get all users with filters and pagination' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false })
@@ -56,52 +56,52 @@ export class UsersController {
   }
 
   @Post(API_ROUTES.USERS.BASE)
-  @Roles(AdminRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   @UsePipes(new ValidationPipe({ transform: true }))
   async createUser(@Body() userData: CreateUserDto): Promise<User> {
     return this.usersService.createUser(userData);
   }
 
   @Put(API_ROUTES.USERS.BY_ID)
-  @Roles(AdminRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   @UsePipes(new ValidationPipe({ transform: true }))
   async updateUser(
     @Param('id', ParseIntPipe) id: number,
     @Body() userData: UpdateUserDto
   ): Promise<User> {
-    return this.usersService.updateUser(id, userData);
+    return this.usersService.updateUser(String(id), userData);
   }
 
   @Put(API_ROUTES.USERS.BY_ID + '/status')
-  @Roles(AdminRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Toggle user active status' })
   @ApiResponse({ status: 200, description: 'User status updated successfully' })
   async toggleUserStatus(
     @Param('id', ParseIntPipe) id: number
   ): Promise<User> {
-    const user = await this.usersService.findById(id);
-    return this.usersService.updateUser(id, { isActive: !user.isActive });
+    const user = await this.usersService.findById(String(id));
+    return this.usersService.updateUser(String(id), { isActive: !user.isActive });
   }
 
   @Delete(API_ROUTES.USERS.BY_ID)
   async deleteUser(@Param('id', ParseIntPipe) id: number): Promise<{ message: string }> {
-    await this.usersService.deleteUser(id);
+    await this.usersService.deleteUser(String(id));
     return { message: 'User deleted successfully' };
   }
 
   @Get(API_ROUTES.USERS.BY_CATEGORY)
-  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ATTENDANCE_ADMIN, AdminRole.FINANCE_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.CHOIR_ADMIN, UserRole.ATTENDANCE_ADMIN, UserRole.FINANCE_ADMIN)
   @ApiParam({ name: 'category', enum: UserCategory })
   async getUsersByCategory(@Param('category') category: UserCategory): Promise<User[]> {
     return this.usersService.getUsersByCategory(category);
   }
 
   @Get(API_ROUTES.USERS.TRANSACTIONS)
-  @Roles(AdminRole.SUPER_ADMIN, AdminRole.FINANCE_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.FINANCE_ADMIN)
   @ApiOperation({ summary: 'Get user transactions' })
   @ApiParam({ name: 'id', type: Number })
   async getUserTransactions(@Param('id', ParseIntPipe) id: number): Promise<Transaction[]> {
-    return this.usersService.getUserTransactions(id);
+    return this.usersService.getUserTransactions(String(id));
   }
 
   @Get(':id/contribution-stats')
@@ -125,7 +125,7 @@ export class UsersController {
       @Query('endDate') endDate?: string
   ) {
       return this.usersService.getUserContributionStats(
-          id,
+          String(id),
           startDate ? new Date(startDate) : undefined,
           endDate ? new Date(endDate) : undefined
       );

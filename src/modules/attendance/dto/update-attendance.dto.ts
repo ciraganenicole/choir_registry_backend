@@ -6,8 +6,8 @@ import { CreateAttendanceDto } from './create-attendance.dto';
 
 export class UpdateAttendanceDto extends PartialType(CreateAttendanceDto) {
     @IsOptional()
-    @IsNumber()
-    userId?: number;
+    @IsString()
+    userId?: string;
 
     @IsOptional()
     @IsString()

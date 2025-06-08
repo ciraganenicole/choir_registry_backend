@@ -16,7 +16,7 @@ interface AttendancePaginationOptions {
   status?: AttendanceStatus;
   startDate?: Date;
   endDate?: Date;
-  userId?: number;
+  userId?: string;
   search?: string;
 }
 
@@ -45,7 +45,7 @@ interface GroupedAttendanceStats {
 interface QueryParams {
     startDate?: Date | string;
     endDate?: Date | string;
-    userId?: number;
+    userId?: string;
     eventType?: string;
     status?: string;
 }
@@ -74,7 +74,8 @@ export class AttendanceService {
       ...rest,
       date: formattedDate,
       eventType,
-      type: AttendanceType.MANUAL
+      type: AttendanceType.MANUAL,
+      userId: String(rest.userId)
     });
 
     return this.attendanceRepository.save(attendance);
@@ -103,7 +104,7 @@ export class AttendanceService {
     }
 
     if (userId) {
-      queryBuilder.andWhere('attendance.userId = :userId', { userId });
+      queryBuilder.andWhere('attendance.userId = :userId', { userId: String(userId) });
     }
 
     if (eventType) {
@@ -125,13 +126,13 @@ export class AttendanceService {
     return queryBuilder.getManyAndCount();
   }
 
-  async findByUser(userId: number, filterDto: AttendanceFilterDto): Promise<[Attendance[], number]> {
+  async findByUser(userId: string, filterDto: AttendanceFilterDto): Promise<[Attendance[], number]> {
     return this.findAll({ ...filterDto, userId });
   }
 
-  async findOne(id: number): Promise<Attendance> {
+  async findOne(id: number | string): Promise<Attendance> {
     const attendance = await this.attendanceRepository.findOne({
-      where: { id },
+      where: { id: String(id) },
       relations: ['user'],
     });
 
@@ -142,21 +143,21 @@ export class AttendanceService {
     return attendance;
   }
 
-  async findAttendanceByUserAndDate(userId: number, date: Date): Promise<Attendance | null> {
+  async findAttendanceByUserAndDate(userId: string, date: Date): Promise<Attendance | null> {
     return this.attendanceRepository
       .createQueryBuilder('attendance')
       .leftJoinAndSelect('attendance.user', 'user')
-      .where('attendance.userId = :userId', { userId })
+      .where('attendance.userId = :userId', { userId: String(userId) })
       .andWhere('attendance.date = :date', { 
         date: date.toISOString().split('T')[0]
       })
       .getOne();
   }
 
-  async getUserAttendance(userId: number, startDate?: Date, endDate?: Date): Promise<Attendance[]> {
+  async getUserAttendance(userId: string, startDate?: Date, endDate?: Date): Promise<Attendance[]> {
     const query = this.attendanceRepository.createQueryBuilder('attendance')
       .leftJoinAndSelect('attendance.user', 'user')
-      .where('attendance.userId = :userId', { userId });
+      .where('attendance.userId = :userId', { userId: String(userId) });
 
     if (startDate && endDate) {
       query.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
@@ -182,7 +183,7 @@ export class AttendanceService {
     }
 
     if (rest.userId) {
-      const user = await this.userRepository.findOne({ where: { id: rest.userId } });
+      const user = await this.userRepository.findOne({ where: { id: String(rest.userId) } });
       if (!user) {
         throw new NotFoundException(`User with ID ${rest.userId} not found`);
       }
@@ -224,7 +225,7 @@ export class AttendanceService {
     const attendanceRecords = users.map(user => {
       const attendance = new Attendance();
       Object.assign(attendance, {
-        userId: user.id,
+        userId: String(user.id),
         date: formattedDate,
         eventType,
         status: AttendanceStatus.ABSENT,
@@ -242,7 +243,7 @@ export class AttendanceService {
 
     // Check if user exists
     const user = await this.userRepository.findOne({
-      where: { id: userId },
+      where: { id: String(userId) },
       relations: ['categories'] // Add this to get user categories
     });
 
@@ -275,12 +276,12 @@ export class AttendanceService {
     }
 
     // Check if attendance record exists for this user
-    let attendance = await this.findAttendanceByUserAndDate(userId, new Date(formattedDate));
+    let attendance = await this.findAttendanceByUserAndDate(String(userId), new Date(formattedDate));
 
     if (!attendance) {
       // Create new attendance record
       attendance = new Attendance();
-      attendance.userId = userId;
+      attendance.userId = String(userId);
       attendance.date = formattedDate;
       attendance.eventType = eventType;
       attendance.status = status;
@@ -321,7 +322,7 @@ export class AttendanceService {
     return this.attendanceRepository.save(attendance);
   }
 
-  async getUserAttendanceStats(userId: number, startDate: Date | string, endDate: Date | string): Promise<AttendanceStats> {
+  async getUserAttendanceStats(userId: string, startDate: Date | string, endDate: Date | string): Promise<AttendanceStats> {
     const startDateStr = typeof startDate === 'string' 
       ? startDate.split('T')[0]
       : new Date(startDate).toISOString().split('T')[0];
@@ -331,7 +332,7 @@ export class AttendanceService {
 
     const attendances = await this.attendanceRepository
       .createQueryBuilder('attendance')
-      .where('attendance.userId = :userId', { userId })
+      .where('attendance.userId = :userId', { userId: String(userId) })
       .andWhere('attendance.date BETWEEN :startDate AND :endDate', {
         startDate: startDateStr,
         endDate: endDateStr
@@ -449,7 +450,7 @@ export class AttendanceService {
   }
 
   async findByUserAndDateRange(
-    userId: number,
+    userId: string,
     startDate: Date | string,
     endDate: Date | string
   ): Promise<Attendance[]> {
@@ -463,7 +464,7 @@ export class AttendanceService {
     return this.attendanceRepository
       .createQueryBuilder('attendance')
       .leftJoinAndSelect('attendance.user', 'user')
-      .where('attendance.userId = :userId', { userId })
+      .where('attendance.userId = :userId', { userId: String(userId) })
       .andWhere('attendance.date BETWEEN :startDate AND :endDate', {
         startDate: startDateStr,
         endDate: endDateStr
@@ -501,7 +502,7 @@ export class AttendanceService {
       .map(user => {
         const attendance = new Attendance();
         Object.assign(attendance, {
-          userId: user.id,
+          userId: String(user.id),
           date: formattedDate,
           eventType,
           status: AttendanceStatus.ABSENT,
@@ -547,7 +548,7 @@ export class AttendanceService {
     const attendanceRecords = users.map(user => {
       const attendance = new Attendance();
       Object.assign(attendance, {
-        userId: user.id,
+        userId: String(user.id),
         date: formattedDate,
         eventType,
         status,

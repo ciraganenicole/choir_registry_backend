@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../users/user.entity';
+import { Choir } from '../choir/choir.entity';
 import { TransactionType, IncomeCategories, ExpenseCategories, SubCategories } from './enums/transactions-categories.enum';
 
 export enum Currency {
@@ -16,8 +17,15 @@ export class Transaction {
   @JoinColumn({ name: 'contributorId' })
   contributor: User | null;
 
-  @Column({ nullable: true })
-  contributorId: number | null;
+  @Column({ type: 'uuid', nullable: true })
+  contributorId: string | null;
+
+  @ManyToOne(() => Choir)
+  @JoinColumn({ name: 'choir_id' })
+  choir: Choir;
+
+  @Column({ name: 'choir_id' })
+  choirId: string;
 
   @Column('decimal', { precision: 10, scale: 2 })
   amount: number;

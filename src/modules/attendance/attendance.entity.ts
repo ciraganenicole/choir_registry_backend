@@ -8,6 +8,7 @@ import {
     JoinColumn 
 } from 'typeorm';
 import { User } from '../users/user.entity';
+import { Choir } from '../choir/choir.entity';
 
 export enum AttendanceStatus {
     PRESENT = 'PRESENT',
@@ -41,15 +42,22 @@ export enum JustificationReason {
 
 @Entity('attendance')
 export class Attendance {
-    @PrimaryGeneratedColumn()
-    id: number;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ type: 'uuid' })
+    userId: string;
 
     @ManyToOne(() => User, user => user.attendances)
     @JoinColumn({ name: 'userId' })
     user: User;
 
-    @Column()
-    userId: number;
+    @ManyToOne(() => Choir)
+    @JoinColumn({ name: 'choir_id' })
+    choir: Choir;
+
+    @Column({ name: 'choir_id' })
+    choirId: string;
 
     @Column({
         type: 'varchar',

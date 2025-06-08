@@ -1,13 +1,23 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AdminRole } from '../../modules/admin/admin-role.enum';
+import { UserRole } from '../../modules/users/enums/role.enum';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<AdminRole[]>('roles', [
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true;
+    }
+
+    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>('roles', [
       context.getHandler(),
       context.getClass(),
     ]);
@@ -19,7 +29,7 @@ export class RolesGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest();
     
     // Super admin has access to everything
-    if (user.role === AdminRole.SUPER_ADMIN) {
+    if (user.role === UserRole.SUPER_ADMIN) {
       return true;
     }
 

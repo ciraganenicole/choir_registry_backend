@@ -48,7 +48,7 @@ export class TransactionService {
     // Handle internal contributor
     else if (createTransactionDto.contributorId) {
       const user = await this.userRepository.findOne({
-        where: { id: createTransactionDto.contributorId }
+        where: { id: String(createTransactionDto.contributorId) }
       });
       if (!user) {
         throw new NotFoundException(`User with ID ${createTransactionDto.contributorId} not found`);
@@ -162,7 +162,7 @@ export class TransactionService {
       transaction.contributor = null;
     } else if (contributorId) {
       const user = await this.userRepository.findOne({
-        where: { id: contributorId }
+        where: { id: String(contributorId) }
       });
       if (!user) {
         throw new NotFoundException(`User with ID ${contributorId} not found`);

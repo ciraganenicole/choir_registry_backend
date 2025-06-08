@@ -1,13 +1,9 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
-import { AdminUser } from './modules/admin/admin_users.entity';
-import { Attendance } from './modules/attendance/attendance.entity';
-import { User } from './modules/users/user.entity';
-import { Transaction } from './modules/transactions/transaction.entity';
 
 config();
 
-const getConnectionUrl = () => {
+export const getConnectionUrl = () => {
   const host = process.env.DB_HOST || 'localhost';
   const port = process.env.DB_PORT || '5432';
   const username = process.env.DB_USERNAME || 'postgres';
@@ -21,12 +17,12 @@ const getConnectionUrl = () => {
 };
 
 export const AppDataSource = new DataSource({
-  type: 'postgres',
   url: getConnectionUrl(),
+  type: 'postgres',
+  entities: ['src/**/*.entity{.ts,.js}'],
+  migrations: ['src/database/migrations/*{.ts,.js}'],
   synchronize: false,
   logging: true,
-  entities: [User, AdminUser, Attendance, Transaction],
-  migrations: ['src/database/migrations/*.ts'],
   subscribers: [],
   ssl: {
     rejectUnauthorized: false

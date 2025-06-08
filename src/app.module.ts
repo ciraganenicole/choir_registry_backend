@@ -1,47 +1,45 @@
-import { Module, OnModuleInit } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { AuthModule } from './modules/auth/auth.module';
-import { AdminModule } from './modules/admin/admin.module';
 import { TransactionModule } from './modules/transactions/transaction.module';
-import { UploadModule } from './modules/upload/upload.module';
-import { initCloudinary } from './config/cloudinary.config';
+import { ChoirModule } from './modules/choir/choir.module';
+import { getConnectionUrl } from './data-source';
+import { ChoirContextMiddleware } from './common/middleware/choir-context.middleware';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    TypeOrmModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST'),
-        port: configService.get('DB_PORT'),
-        username: configService.get('DB_USERNAME'),
-        password: configService.get('DB_PASSWORD'),
-        database: configService.get('DB_DATABASE'),
-        entities: ['dist/**/*.entity{.ts,.js}'],
-        synchronize: false,
-      }),
-      inject: [ConfigService],
+    TypeOrmModule.forRoot({
+      url: getConnectionUrl(),
+      type: 'postgres',
+      autoLoadEntities: true,
+      synchronize: process.env.NODE_ENV !== 'production',
+      ssl: process.env.NODE_ENV === 'production' ? {
+        rejectUnauthorized: false
+      } : false
     }),
-    AdminModule,
+    JwtModule.register({
+      global: true,
+      secret: process.env.JWT_SECRET,
+      signOptions: { expiresIn: '1d' },
+    }),
+    AuthModule,
     UsersModule,
     AttendanceModule,
-    AuthModule,
     TransactionModule,
-    UploadModule
+    ChoirModule
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
-export class AppModule implements OnModuleInit {
-  onModuleInit() {
-    // initCloudinary();
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(ChoirContextMiddleware)
+      .forRoutes('*');
   }
 }

@@ -3,14 +3,16 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
-import { AdminModule } from '../admin/admin.module';
+import { ChoirModule } from '../choir/choir.module';
 import { JwtStrategy } from './jwt.strategy';
 import { AuthController } from './auth.controller';
 import { GuardsModule } from '../../common/guards/guards.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
     imports: [
-        AdminModule,
+        UsersModule,
+        ChoirModule,
         PassportModule,
         GuardsModule,
         JwtModule.registerAsync({

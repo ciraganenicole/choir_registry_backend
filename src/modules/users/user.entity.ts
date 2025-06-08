@@ -8,13 +8,16 @@ import { Commission } from './enums/commission.enum';
 import { UserCategory } from './enums/user-category.enum';
 import { Attendance } from '../attendance/attendance.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { Choir } from '../choir/choir.entity';
+import { UserRole } from './enums/role.enum';
+import { UserStatus, StatusReason } from './enums/status.enum';
 
 //Nullable values except firstname & lastname
 
 @Entity('users')
 export class User {
-    @PrimaryGeneratedColumn()
-    id: number;
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
 
     @Column()
     firstName: string; // PRENOM
@@ -78,8 +81,11 @@ export class User {
     @Column({ nullable: true })
     whatsappNumber: string; // NUMERO WHATSAPP
 
-    @Column({ unique: true, nullable: true })
+    @Column({ unique: true })
     email: string;
+
+    @Column({ nullable: true })
+    password: string; // Required for admin roles (SUPER_ADMIN, CHOIR_ADMIN, etc.), null for regular choir members
 
     @Column({ nullable: true })
     phone: string;
@@ -123,8 +129,36 @@ export class User {
     @Column({ default: true, nullable: true })
     isActive: boolean;
 
+    @Column({
+        type: 'varchar',
+        enum: UserStatus,
+        nullable: true
+    })
+    status: UserStatus;
+
+    @Column({
+        type: 'varchar',
+        enum: StatusReason,
+        nullable: true
+    })
+    statusReason: StatusReason;
+
     @Column({ nullable: true })
     profileImageUrl: string; // Cloudinary public ID
+
+    @Column({ nullable: true })
+    choirId: string;
+
+    @ManyToOne(() => Choir, { nullable: true })
+    @JoinColumn({ name: 'choirId' })
+    choir: Choir;
+
+    @Column({
+        type: 'enum',
+        enum: UserRole,
+        default: UserRole.CHOIR_MEMBER
+    })
+    role: UserRole;
 
     @CreateDateColumn()
     createdAt: Date;
