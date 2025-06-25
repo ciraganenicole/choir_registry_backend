@@ -291,15 +291,6 @@ export class TransactionService {
         : new Date(endDate).toISOString().split('T')[0])
       : currentMonthEnd.toISOString().split('T')[0];
 
-    console.log('Date Filter Debug:', {
-      inputStartDate: startDate,
-      inputEndDate: endDate,
-      formattedStartDate: startDateStr,
-      formattedEndDate: endDateStr,
-      currentMonthStart: currentMonthStart.toISOString().split('T')[0],
-      currentMonthEnd: currentMonthEnd.toISOString().split('T')[0]
-    });
-
     const query = this.transactionRepository.createQueryBuilder('transaction');
 
     // Use >= for start date and <= for end date since we're working with a date column
@@ -308,28 +299,9 @@ export class TransactionService {
 
     const transactions = await query.getMany();
 
-    console.log('Query Results:', {
-      totalTransactions: transactions.length,
-      dateRange: transactions.length > 0 ? {
-        earliest: transactions[0].transactionDate,
-        latest: transactions[transactions.length - 1].transactionDate
-      } : 'No transactions found',
-      transactions: transactions.map(t => ({
-        date: t.transactionDate,
-        amount: t.amount,
-        currency: t.currency,
-        type: t.type
-      }))
-    });
-
     // Calculate totals by currency
     const usdTransactions = transactions.filter(t => t.currency === Currency.USD);
     const fcTransactions = transactions.filter(t => t.currency === Currency.FC);
-
-    console.log('Currency Filtering:', {
-      usdTransactions: usdTransactions.map(t => ({ amount: t.amount, type: t.type })),
-      fcTransactions: fcTransactions.map(t => ({ amount: t.amount, type: t.type }))
-    });
 
     const usdTotal = usdTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
     const fcTotal = fcTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
@@ -354,16 +326,6 @@ export class TransactionService {
     // Calculate daily totals using the provided date range
     const dailyTotalUSD = usdTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
     const dailyTotalFC = fcTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-
-    console.log('Stats Summary:', {
-      usdTotal,
-      fcTotal,
-      monthlyBreakdown,
-      monthlyBreakdownKeys: Object.keys(monthlyBreakdown),
-      dailyTotalUSD,
-      dailyTotalFC
-    });
-
     return {
       totals: {
         usd: usdTotal,
@@ -541,7 +503,7 @@ export class TransactionService {
       }
 
       const transactions = await query
-        .orderBy('transaction.transactionDate', 'ASC')
+        .orderBy('transaction.transactionDate', 'DESC')
         .getMany();
 
       // Get unique dates
