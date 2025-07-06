@@ -7,7 +7,7 @@ import { TransactionFilterDto } from './dto/transaction-filter.dto';
 import { User } from '../users/user.entity';
 import { TransactionType, isCategoryValidForType, SubCategories } from './enums/transactions-categories.enum';
 import { DailyContributionFilterDto } from './dto/daily-contribution.dto';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, subMonths } from 'date-fns';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
 @Injectable()
@@ -276,25 +276,29 @@ export class TransactionService {
   }
 
   async getStats(startDate?: Date | string, endDate?: Date | string, filterDto?: TransactionFilterDto) {
-    // If no dates provided, default to current month
-    const currentMonthStart = startOfMonth(new Date());
-    const currentMonthEnd = endOfMonth(new Date());
-
-    const startDateStr = startDate 
-      ? (typeof startDate === 'string' 
-        ? startDate.split('T')[0]
-        : new Date(startDate).toISOString().split('T')[0])
-      : currentMonthStart.toISOString().split('T')[0];
-    const endDateStr = endDate
-      ? (typeof endDate === 'string'
-        ? endDate.split('T')[0]
-        : new Date(endDate).toISOString().split('T')[0])
-      : currentMonthEnd.toISOString().split('T')[0];
-
-    // Build query with filters
+    // Build query without default date filtering
     const query = this.transactionRepository.createQueryBuilder('transaction');
-    query.andWhere('transaction.transactionDate >= :startDate', { startDate: startDateStr })
-         .andWhere('transaction.transactionDate <= :endDate', { endDate: endDateStr });
+    
+    // Only apply date filtering if dates are explicitly provided
+    if (startDate || endDate) {
+      const startDateStr = startDate 
+        ? (typeof startDate === 'string' 
+          ? startDate.split('T')[0]
+          : new Date(startDate).toISOString().split('T')[0])
+        : undefined;
+      const endDateStr = endDate
+        ? (typeof endDate === 'string'
+          ? endDate.split('T')[0]
+          : new Date(endDate).toISOString().split('T')[0])
+        : undefined;
+
+      if (startDateStr) {
+        query.andWhere('transaction.transactionDate >= :startDate', { startDate: startDateStr });
+      }
+      if (endDateStr) {
+        query.andWhere('transaction.transactionDate <= :endDate', { endDate: endDateStr });
+      }
+    }
 
     // Apply additional filters if provided
     if (filterDto) {
@@ -376,6 +380,33 @@ export class TransactionService {
     const dailyTotalUSD = dailyUSDTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
     const dailyTotalFC = dailyFCTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
+    // Determine date range for response
+    let dateRange;
+    if (startDate || endDate) {
+      const startDateStr = startDate 
+        ? (typeof startDate === 'string' 
+          ? startDate.split('T')[0]
+          : new Date(startDate).toISOString().split('T')[0])
+        : undefined;
+      const endDateStr = endDate
+        ? (typeof endDate === 'string'
+          ? endDate.split('T')[0]
+          : new Date(endDate).toISOString().split('T')[0])
+        : undefined;
+      
+      dateRange = {
+        from: startDateStr ? new Date(startDateStr) : null,
+        to: endDateStr ? new Date(endDateStr) : null
+      };
+    } else {
+      // If no date filter, show the full range of available data
+      const allDates = transactions.map(t => new Date(t.transactionDate)).sort((a, b) => a.getTime() - b.getTime());
+      dateRange = {
+        from: allDates.length > 0 ? allDates[0] : null,
+        to: allDates.length > 0 ? allDates[allDates.length - 1] : null
+      };
+    }
+
     const result = {
       totals: {
         income: totalIncome,
@@ -383,10 +414,7 @@ export class TransactionService {
         solde
       },
       monthlyBreakdown,
-      dateRange: {
-        from: new Date(startDateStr),
-        to: new Date(endDateStr)
-      },
+      dateRange,
       dailyTotalUSD,
       dailyTotalFC
     };
