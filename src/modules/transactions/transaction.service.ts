@@ -7,7 +7,7 @@ import { TransactionFilterDto } from './dto/transaction-filter.dto';
 import { User } from '../users/user.entity';
 import { TransactionType, isCategoryValidForType, SubCategories } from './enums/transactions-categories.enum';
 import { DailyContributionFilterDto } from './dto/daily-contribution.dto';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, subMonths } from 'date-fns';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
 @Injectable()
@@ -275,7 +275,7 @@ export class TransactionService {
     };
   }
 
-  async getStats(startDate?: Date | string, endDate?: Date | string, filterDto?: TransactionFilterDto) {
+  async getStats(startDate?: Date | string, endDate?: Date | string) {
     // If no dates provided, default to current month
     const currentMonthStart = startOfMonth(new Date());
     const currentMonthEnd = endOfMonth(new Date());
@@ -291,8 +291,18 @@ export class TransactionService {
         : new Date(endDate).toISOString().split('T')[0])
       : currentMonthEnd.toISOString().split('T')[0];
 
-    // Build query with filters
+    console.log('Date Filter Debug:', {
+      inputStartDate: startDate,
+      inputEndDate: endDate,
+      formattedStartDate: startDateStr,
+      formattedEndDate: endDateStr,
+      currentMonthStart: currentMonthStart.toISOString().split('T')[0],
+      currentMonthEnd: currentMonthEnd.toISOString().split('T')[0]
+    });
+
     const query = this.transactionRepository.createQueryBuilder('transaction');
+
+    // Use >= for start date and <= for end date since we're working with a date column
     query.andWhere('transaction.transactionDate >= :startDate', { startDate: startDateStr })
          .andWhere('transaction.transactionDate <= :endDate', { endDate: endDateStr });
 
@@ -364,29 +374,27 @@ export class TransactionService {
       return acc;
     }, {} as Record<string, { income: { usd: number; fc: number }, expense: { usd: number; fc: number }, solde: { usd: number; fc: number } }>);
 
-    // Calculate overall solde
-    const solde = {
-      usd: totalIncome.usd - totalExpense.usd,
-      fc: totalIncome.fc - totalExpense.fc
-    };
+    // Calculate daily totals using the provided date range
+    const dailyTotalUSD = usdTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const dailyTotalFC = fcTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
-    // For backward compatibility, but only for DAILY category
-    const dailyUSDTransactions = transactions.filter(t => t.currency === Currency.USD && t.category === 'DAILY');
-    const dailyFCTransactions = transactions.filter(t => t.currency === Currency.FC && t.category === 'DAILY');
-    const dailyTotalUSD = dailyUSDTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const dailyTotalFC = dailyFCTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    console.log('Stats Summary:', {
+      usdTotal,
+      fcTotal,
+      monthlyBreakdown,
+      monthlyBreakdownKeys: Object.keys(monthlyBreakdown),
+      dailyTotalUSD,
+      dailyTotalFC
+    });
 
-    const result = {
+    return {
       totals: {
         income: totalIncome,
         expense: totalExpense,
         solde
       },
       monthlyBreakdown,
-      dateRange: {
-        from: new Date(startDateStr),
-        to: new Date(endDateStr)
-      },
+      dateRange,
       dailyTotalUSD,
       dailyTotalFC
     };

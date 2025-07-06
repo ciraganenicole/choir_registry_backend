@@ -9,6 +9,7 @@ import { UserCategory } from './enums/user-category.enum';
 import { UserFilterDto } from './dto/user-filter.dto';
 import { v2 as cloudinary } from 'cloudinary';
 import { Transaction } from '../transactions/transaction.entity';
+import { Attendance } from '../attendance/attendance.entity';
 import { ConfigService } from '@nestjs/config';
 import { TransactionType } from '../transactions/enums/transactions-categories.enum';
 
@@ -239,8 +240,44 @@ export class UsersService implements OnModuleInit {
     }
 
     async deleteUser(id: number): Promise<void> {
-        const user = await this.findById(id);
-        await this.userRepository.remove(user);
+        const queryRunner = this.userRepository.manager.connection.createQueryRunner();
+        
+        try {
+            await queryRunner.connect();
+            await queryRunner.startTransaction();
+
+            // Find the user with relations
+            const user = await queryRunner.manager.findOne(User, {
+                where: { id },
+                relations: ['transactions', 'attendances']
+            });
+
+            if (!user) {
+                throw new NotFoundException(`User with ID ${id} not found`);
+            }
+
+            // Delete related transactions first
+            if (user.transactions && user.transactions.length > 0) {
+                await queryRunner.manager.remove(Transaction, user.transactions);
+            }
+
+            // Delete related attendances
+            if (user.attendances && user.attendances.length > 0) {
+                await queryRunner.manager.remove(Attendance, user.attendances);
+            }
+
+            // Finally delete the user
+            await queryRunner.manager.remove(User, user);
+
+            await queryRunner.commitTransaction();
+        } catch (error) {
+            if (queryRunner.isTransactionActive) {
+                await queryRunner.rollbackTransaction();
+            }
+            throw error;
+        } finally {
+            await queryRunner.release();
+        }
     }
 
     async getUsersByCategory(category: UserCategory): Promise<User[]> {
