@@ -596,6 +596,13 @@ export class TransactionService {
       const contributors = Array.from(contributorsMap.values())
         .sort((a, b) => (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName));
 
+      // Debug log
+      console.log('Daily Contributions Debug:', JSON.stringify({
+        filters,
+        dates,
+        contributorsSample: contributors.slice(0, 2)
+      }, null, 2));
+
       return {
         dates,
         contributors,

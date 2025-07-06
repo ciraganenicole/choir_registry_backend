@@ -8,6 +8,7 @@ import { Commission } from './enums/commission.enum';
 import { UserCategory } from './enums/user-category.enum';
 import { Attendance } from '../attendance/attendance.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { UserRole } from './enums/user-role.enum';
 
 //Nullable values except firstname & lastname
 
@@ -125,6 +126,13 @@ export class User {
 
     @Column({ nullable: true })
     profileImageUrl: string; // Cloudinary public ID
+
+    @Column({
+        type: 'varchar',
+        enum: UserRole,
+        default: UserRole.MEMBER
+    })
+    role: UserRole;
 
     @CreateDateColumn()
     createdAt: Date;

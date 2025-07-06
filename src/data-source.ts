@@ -4,6 +4,7 @@ import { AdminUser } from './modules/admin/admin_users.entity';
 import { Attendance } from './modules/attendance/attendance.entity';
 import { User } from './modules/users/user.entity';
 import { Transaction } from './modules/transactions/transaction.entity';
+import { Song } from './modules/song/song.entity';
 
 config();
 
@@ -25,7 +26,7 @@ export const AppDataSource = new DataSource({
   url: getConnectionUrl(),
   synchronize: false,
   logging: true,
-  entities: [User, AdminUser, Attendance, Transaction],
+  entities: [User, AdminUser, Attendance, Transaction, Song],
   migrations: ['src/database/migrations/*.ts'],
   subscribers: [],
   ssl: {

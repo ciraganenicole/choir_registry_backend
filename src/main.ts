@@ -12,7 +12,7 @@ async function bootstrap() {
 
   // Enable CORS for frontend
   app.enableCors({
-    origin: ['http://192.168.1.80:3000', 'https://njc-five.vercel.app'],
+    origin: ['http://localhost:3000', 'https://njc-five.vercel.app'],
     methods: 'GET, POST, PUT, DELETE',
     allowedHeaders: 'Content-Type, Authorization',
     credentials: true,

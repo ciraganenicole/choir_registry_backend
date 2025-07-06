@@ -10,6 +10,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { TransactionModule } from './modules/transactions/transaction.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { initCloudinary } from './config/cloudinary.config';
+import { SongModule } from './modules/song/song.module';
 
 @Module({
   imports: [
@@ -35,7 +36,8 @@ import { initCloudinary } from './config/cloudinary.config';
     AttendanceModule,
     AuthModule,
     TransactionModule,
-    UploadModule
+    UploadModule,
+    SongModule
   ],
   controllers: [AppController],
   providers: [AppService],
