@@ -275,7 +275,7 @@ export class TransactionService {
     };
   }
 
-  async getStats(startDate?: Date | string, endDate?: Date | string) {
+  async getStats(startDate?: Date | string, endDate?: Date | string, filterDto?: TransactionFilterDto) {
     // If no dates provided, default to current month
     const currentMonthStart = startOfMonth(new Date());
     const currentMonthEnd = endOfMonth(new Date());
@@ -291,45 +291,96 @@ export class TransactionService {
         : new Date(endDate).toISOString().split('T')[0])
       : currentMonthEnd.toISOString().split('T')[0];
 
+    // Build query with filters
     const query = this.transactionRepository.createQueryBuilder('transaction');
-
-    // Use >= for start date and <= for end date since we're working with a date column
     query.andWhere('transaction.transactionDate >= :startDate', { startDate: startDateStr })
          .andWhere('transaction.transactionDate <= :endDate', { endDate: endDateStr });
 
+    // Apply additional filters if provided
+    if (filterDto) {
+      if (filterDto.type) {
+        query.andWhere('transaction.type = :type', { type: filterDto.type });
+      }
+      if (filterDto.category) {
+        query.andWhere('transaction.category = :category', { category: filterDto.category });
+      }
+      if (filterDto.subcategory) {
+        query.andWhere('transaction.subcategory = :subcategory', { subcategory: filterDto.subcategory });
+      }
+      if (filterDto.contributorId) {
+        query.andWhere('transaction.contributorId = :contributorId', { contributorId: filterDto.contributorId });
+      }
+      if (filterDto.currency) {
+        query.andWhere('transaction.currency = :currency', { currency: filterDto.currency });
+      }
+      if (filterDto.search) {
+        query.leftJoinAndSelect('transaction.contributor', 'contributor');
+        query.andWhere(
+          '(LOWER(contributor.firstName) LIKE LOWER(:search) OR LOWER(contributor.lastName) LIKE LOWER(:search) OR LOWER(transaction.externalContributorName) LIKE LOWER(:search))',
+          { search: `%${filterDto.search}%` }
+        );
+      }
+    }
+
     const transactions = await query.getMany();
 
-    // Calculate totals by currency
-    const usdTransactions = transactions.filter(t => t.currency === Currency.USD);
-    const fcTransactions = transactions.filter(t => t.currency === Currency.FC);
+    // Separate incomes and expenses by currency
+    let totalIncome = { usd: 0, fc: 0 };
+    let totalExpense = { usd: 0, fc: 0 };
 
-    const usdTotal = usdTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const fcTotal = fcTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-
-    // Calculate monthly breakdown
+    // Monthly breakdown
     const monthlyBreakdown = transactions.reduce((acc, transaction) => {
       const month = new Date(transaction.transactionDate).toISOString().slice(0, 7); // YYYY-MM
       if (!acc[month]) {
         acc[month] = {
-          usd: 0,
-          fc: 0
+          income: { usd: 0, fc: 0 },
+          expense: { usd: 0, fc: 0 },
+          solde: { usd: 0, fc: 0 }
         };
       }
-      if (transaction.currency === Currency.USD) {
-        acc[month].usd += Number(transaction.amount);
+      const isIncome = transaction.type === TransactionType.INCOME;
+      const currency = transaction.currency;
+      const amount = Number(transaction.amount);
+      if (isIncome) {
+        if (currency === Currency.USD) {
+          acc[month].income.usd += amount;
+          totalIncome.usd += amount;
+        } else if (currency === Currency.FC) {
+          acc[month].income.fc += amount;
+          totalIncome.fc += amount;
+        }
       } else {
-        acc[month].fc += Number(transaction.amount);
+        if (currency === Currency.USD) {
+          acc[month].expense.usd += amount;
+          totalExpense.usd += amount;
+        } else if (currency === Currency.FC) {
+          acc[month].expense.fc += amount;
+          totalExpense.fc += amount;
+        }
       }
+      // Update solde for the month
+      acc[month].solde.usd = acc[month].income.usd - acc[month].expense.usd;
+      acc[month].solde.fc = acc[month].income.fc - acc[month].expense.fc;
       return acc;
-    }, {} as Record<string, { usd: number; fc: number }>);
+    }, {} as Record<string, { income: { usd: number; fc: number }, expense: { usd: number; fc: number }, solde: { usd: number; fc: number } }>);
 
-    // Calculate daily totals using the provided date range
-    const dailyTotalUSD = usdTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const dailyTotalFC = fcTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    return {
+    // Calculate overall solde
+    const solde = {
+      usd: totalIncome.usd - totalExpense.usd,
+      fc: totalIncome.fc - totalExpense.fc
+    };
+
+    // For backward compatibility, but only for DAILY category
+    const dailyUSDTransactions = transactions.filter(t => t.currency === Currency.USD && t.category === 'DAILY');
+    const dailyFCTransactions = transactions.filter(t => t.currency === Currency.FC && t.category === 'DAILY');
+    const dailyTotalUSD = dailyUSDTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const dailyTotalFC = dailyFCTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const result = {
       totals: {
-        usd: usdTotal,
-        fc: fcTotal
+        income: totalIncome,
+        expense: totalExpense,
+        solde
       },
       monthlyBreakdown,
       dateRange: {
@@ -339,6 +390,8 @@ export class TransactionService {
       dailyTotalUSD,
       dailyTotalFC
     };
+
+    return result;
   }
 
   private getPeriods(startDate: Date, endDate: Date, groupBy: 'week' | 'month' | 'year'): string[] {
@@ -503,7 +556,7 @@ export class TransactionService {
       }
 
       const transactions = await query
-        .orderBy('transaction.transactionDate', 'DESC')
+        .orderBy('transaction.transactionDate', 'ASC')
         .getMany();
 
       // Get unique dates
@@ -552,7 +605,6 @@ export class TransactionService {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      console.error('Error in getDailyContributions:', error);
       throw new BadRequestException('Failed to fetch daily contributions. Please check your input parameters.');
     }
   }
