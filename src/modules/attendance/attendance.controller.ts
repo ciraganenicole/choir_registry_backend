@@ -30,6 +30,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AdminRole } from '../admin/admin-role.enum';
+import { UserCategory } from '../users/enums/user-category.enum';
 import { AttendanceEventType } from './attendance.entity';
 import { AttendanceStatus } from './attendance.entity';
 
@@ -49,14 +50,14 @@ export class AttendanceController {
     }
 
     @Get()
-    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN, UserCategory.LEAD)
     @ApiOperation({ summary: 'Get all attendance records with filters' })
     findAll(@Query() filterDto: AttendanceFilterDto) {
         return this.attendanceService.findAll(filterDto);
     }
 
     @Get('user/:userId')
-    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN, UserCategory.LEAD)
     @ApiOperation({ summary: 'Get attendance records for a specific user' })
     findByUser(
         @Param('userId', ParseIntPipe) userId: number,

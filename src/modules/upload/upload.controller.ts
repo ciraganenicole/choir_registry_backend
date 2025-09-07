@@ -43,11 +43,6 @@ export class UploadController {
 
     try {
       const imageUrl = await uploadToCloudinary(file);
-      
-      // Clean up the temporary file
-      fs.unlink(file.path, (err) => {
-        if (err) console.error('Error deleting temporary file:', err);
-      });
 
       return { url: imageUrl };
     } catch (error: any) {

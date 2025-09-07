@@ -44,7 +44,6 @@ export class TransactionController {
       const result = await this.transactionService.findAll(filterDto);
       return result;
     } catch (error) {
-      console.error('Error in findAll:', error);
       throw error;
     }
   }

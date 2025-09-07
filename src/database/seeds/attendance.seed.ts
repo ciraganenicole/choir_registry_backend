@@ -42,7 +42,6 @@ function convertDate(dateStr: string | undefined): string | null {
 
         return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     } catch (error) {
-        console.log(`Error converting date: ${dateStr}`);
         return null;
     }
 }
@@ -55,7 +54,6 @@ export const seedAttendance = async (dataSource: DataSource): Promise<void> => {
         // Get all users
         const users = await userRepository.find();
         if (!users.length) {
-            console.log('No users found for attendance seeding');
             return;
         }
 
@@ -86,7 +84,6 @@ export const seedAttendance = async (dataSource: DataSource): Promise<void> => {
             const user = users[i]; // Use the same index to get the corresponding user
 
             if (!user) {
-                console.log(`No user found at index ${i}`);
                 continue;
             }
 
@@ -95,7 +92,6 @@ export const seedAttendance = async (dataSource: DataSource): Promise<void> => {
                 .map(([date, symbol]) => {
                     const convertedDate = convertDate(date);
                     if (!convertedDate) {
-                        console.log(`Skipping invalid date: ${date}`);
                         return null;
                     }
                     return { date: convertedDate, symbol: symbol as string };
@@ -159,10 +155,7 @@ export const seedAttendance = async (dataSource: DataSource): Promise<void> => {
                 recordsCreated++;
             }
         }
-        
-        console.log(`Created ${recordsCreated} rehearsal attendance records from CSV`);
     } catch (error) {
-        console.error('Error seeding attendance:', error);
         throw error;
     }
 }; 

@@ -3,5 +3,6 @@ export enum UserCategory {
     NORMAL = 'NORMAL',
     WORSHIPPER = 'WORSHIPPER',
     COMMITTEE = 'COMMITTEE',
-    NEWCOMER = 'NEWCOMER'
+    NEWCOMER = 'NEWCOMER',
+    LEAD = 'LEAD'
 } 

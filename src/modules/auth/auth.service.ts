@@ -1,10 +1,12 @@
 import { Injectable, UnauthorizedException, ConflictException, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { AdminUsersService } from "../admin/admin_users.service";
+import { UsersService } from "../users/users.service";
 import { LoginDto, RegisterAdminDto } from "../../common/dtos/auth.dto";
 import { CreateAdminDto } from "../../common/dtos/admin.dto";
 import * as bcrypt from "bcrypt";
 import { AdminRole } from "../admin/admin-role.enum";
+import { UserCategory } from "../users/enums/user-category.enum";
 
 @Injectable()
 export class AuthService {
@@ -12,50 +14,97 @@ export class AuthService {
 
     constructor(
         private jwtService: JwtService,
-        private adminUsersService: AdminUsersService
+        private adminUsersService: AdminUsersService,
+        private usersService: UsersService
     ) {}
 
     async validateUser(email: string, pass: string) {
-        const user = await this.adminUsersService.findOneByEmail(email);
-        if (!user || !user.isActive) {
-            throw new UnauthorizedException('Invalid credentials or inactive account');
+        // First try to find as admin user
+        const adminUser = await this.adminUsersService.findOneByEmail(email);
+        if (adminUser && adminUser.isActive) {
+            const isPasswordValid = await bcrypt.compare(pass, adminUser.password);
+            if (isPasswordValid) {
+                return { id: adminUser.id, email: adminUser.email, role: adminUser.role, type: 'admin' };
+            }
         }
 
-        const isPasswordValid = await bcrypt.compare(pass, user.password);
-        if (!isPasswordValid) {
-            throw new UnauthorizedException('Invalid credentials');
+        // If not found as admin, try as regular user
+        const regularUser = await this.usersService.validateUserCredentials(email, pass);
+        if (regularUser) {
+            return { 
+                id: regularUser.id, 
+                email: regularUser.email, 
+                categories: regularUser.categories,
+                firstName: regularUser.firstName,
+                lastName: regularUser.lastName,
+                type: 'user'
+            };
         }
 
-        return { id: user.id, email: user.email, role: user.role };
+        throw new UnauthorizedException('Invalid credentials or inactive account');
     }
 
     async login(loginDto: LoginDto) {
+        // First try to find as admin user
         const admin = await this.adminUsersService.findOneByEmail(loginDto.email);
-        if (!admin || !admin.isActive) {
-            throw new UnauthorizedException('Invalid credentials or inactive account');
-        }
+        if (admin && admin.isActive) {
+            const isPasswordValid = await bcrypt.compare(loginDto.password, admin.password);
+            if (isPasswordValid) {
+                const payload = { 
+                    sub: admin.id, 
+                    email: admin.email,
+                    username: admin.username,
+                    role: admin.role,
+                    type: 'admin'
+                };
 
-        const isPasswordValid = await bcrypt.compare(loginDto.password, admin.password);
-        if (!isPasswordValid) {
-            throw new UnauthorizedException('Invalid credentials');
-        }
-
-        const payload = { 
-            sub: admin.id, 
-            email: admin.email,
-            username: admin.username,
-            role: admin.role
-        };
-
-        return {
-            access_token: this.jwtService.sign(payload),
-            user: {
-                id: admin.id,
-                email: admin.email,
-                username: admin.username,
-                role: admin.role
+                return {
+                    access_token: this.jwtService.sign(payload),
+                    user: {
+                        id: admin.id,
+                        email: admin.email,
+                        username: admin.username,
+                        role: admin.role,
+                        type: 'admin'
+                    }
+                };
             }
-        };
+        }
+
+        // If not found as admin, try as regular user
+        const regularUser = await this.usersService.validateUserCredentials(loginDto.email, loginDto.password);
+        if (regularUser) {
+            // Determine role based on categories
+            let role = 'USER';
+            if (regularUser.categories?.includes(UserCategory.LEAD)) {
+                role = UserCategory.LEAD;
+            }
+
+            const payload = { 
+                sub: regularUser.id, 
+                email: regularUser.email,
+                firstName: regularUser.firstName,
+                lastName: regularUser.lastName,
+                categories: regularUser.categories,
+                role: role,
+                type: 'user'
+            };
+
+            return {
+                access_token: this.jwtService.sign(payload),
+                user: {
+                    id: regularUser.id,
+                    email: regularUser.email,
+                    firstName: regularUser.firstName,
+                    lastName: regularUser.lastName,
+                    categories: regularUser.categories,
+                    role: role,
+                    type: 'user'
+                }
+            };
+        }
+
+        throw new UnauthorizedException('Invalid credentials or inactive account');
     }
 
     async createInitialSuperAdmin() {
@@ -97,7 +146,7 @@ export class AuthService {
     }
 
     async refreshToken(userId: string) {
-        const user = await this.adminUsersService.findById(userId);
+        const user = await this.adminUsersService.findById(parseInt(userId));
         if (!user || !user.isActive) {
             throw new UnauthorizedException('Invalid or inactive user');
         }

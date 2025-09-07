@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AdminModule } from '../admin/admin.module';
+import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './jwt.strategy';
 import { AuthController } from './auth.controller';
 import { GuardsModule } from '../../common/guards/guards.module';
@@ -11,6 +12,7 @@ import { GuardsModule } from '../../common/guards/guards.module';
 @Module({
     imports: [
         AdminModule,
+        UsersModule,
         PassportModule,
         GuardsModule,
         JwtModule.registerAsync({

@@ -34,7 +34,7 @@ export class AdminUsersService {
         return this.adminUserRepository.findOne({ where: { email } });
     }
     
-    async findById(id: string): Promise<AdminUser> {
+    async findById(id: number): Promise<AdminUser> {
         const admin = await this.adminUserRepository.findOne({ where: { id } });
         if (!admin) {
             throw new NotFoundException('Admin not found');
@@ -42,7 +42,7 @@ export class AdminUsersService {
         return admin;
     }
 
-    async updateAdmin(id: string, updateData: UpdateAdminDto): Promise<AdminUser> {
+    async updateAdmin(id: number, updateData: UpdateAdminDto): Promise<AdminUser> {
         const admin = await this.findById(id);
 
         if (updateData.password) {
@@ -53,7 +53,7 @@ export class AdminUsersService {
         return this.findById(id);
     }
 
-    async deactivateAdmin(id: string): Promise<void> {
+    async deactivateAdmin(id: number): Promise<void> {
         await this.findById(id);
         await this.adminUserRepository.update(id, { isActive: false });
     }

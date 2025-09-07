@@ -13,7 +13,6 @@ import { Currency } from '../../modules/transactions/transaction.entity';
 
 export class TransactionSeeder implements Seeder {
   async run(dataSource: DataSource): Promise<void> {
-    console.log('Starting to seed transactions...');
     const transactionRepository = dataSource.getRepository(Transaction);
     const userRepository = dataSource.getRepository(User);
 
@@ -22,7 +21,6 @@ export class TransactionSeeder implements Seeder {
       const users = await userRepository.find({ take: 5 });
       
       if (users.length === 0) {
-        console.log('No users found. Skipping user-related transactions.');
         return;
       }
 
@@ -196,11 +194,7 @@ export class TransactionSeeder implements Seeder {
         ...transaction,
         transactionDate: new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000)
       }));
-
-      // await transactionRepository.save([...transactions, ...pastTransactions]);
-      console.log('Transaction seeding completed successfully');
     } catch (error) {
-      console.error('Error seeding transactions:', error);
       throw error;
     }
   }

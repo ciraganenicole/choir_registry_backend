@@ -8,8 +8,8 @@ import { AdminRole } from './admin-role.enum';
 
 @Entity('admin_users')
 export class AdminUser {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column({ unique: true })
   email: string;

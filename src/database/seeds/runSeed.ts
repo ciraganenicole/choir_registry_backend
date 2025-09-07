@@ -15,14 +15,7 @@ const runSeed = async () => {
     console.log('🔄 Running migrations...');
     await AppDataSource.runMigrations();
     console.log('✅ Migrations completed');
-
-    // Run seeds
-    console.log('🌱 Starting seeding...');
-    //await adminSeeder(AppDataSource);
-    // await new TransactionSeeder().run(AppDataSource);
     await seedAttendance(AppDataSource);
-    //await seedUsers(AppDataSource);
-    console.log('🎉 Seeding completed successfully!');
 
   } catch (error) {
     console.error('❌ Error during seeding:', error);
