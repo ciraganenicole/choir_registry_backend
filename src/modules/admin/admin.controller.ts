@@ -46,7 +46,7 @@ export class AdminController {
         @Param('id') id: string,
         @Body() updateData: UpdateAdminDto
     ) {
-        return this.adminService.updateAdmin(id, updateData);
+        return this.adminService.updateAdmin(parseInt(id), updateData);
     }
 
     @Delete(':id')
@@ -54,7 +54,7 @@ export class AdminController {
     async deactivateAdmin(
         @Param('id') id: string
     ) {
-        await this.adminService.deactivateAdmin(id);
+        await this.adminService.deactivateAdmin(parseInt(id));
         return { message: 'Admin deactivated successfully' };
     }
 } 

@@ -1,13 +1,14 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AdminRole } from '../../modules/admin/admin-role.enum';
+import { UserCategory } from '../../modules/users/enums/user-category.enum';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<AdminRole[]>('roles', [
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>('roles', [
       context.getHandler(),
       context.getClass(),
     ]);
@@ -23,7 +24,16 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    // Check if user has the required role
-    return requiredRoles.includes(user.role);
+    // Check if user has the required role (admin roles)
+    if (requiredRoles.includes(user.role)) {
+      return true;
+    }
+
+    // Check if user has the required category (for UserCategory values)
+    if (user.categories && Array.isArray(user.categories)) {
+      return requiredRoles.some((role) => user.categories.includes(role));
+    }
+
+    return false;
   }
 } 

@@ -1,16 +1,18 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { UsersModule } from './modules/users/users.module';
-import { AttendanceModule } from './modules/attendance/attendance.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { SongModule } from './modules/song/song.module';
+import { LeadershipShiftModule } from './modules/leadership-shift/leadership-shift.module';
+import { PerformanceModule } from './modules/performance/performance.module';
+import { RehearsalModule } from './modules/rehearsal/rehearsal.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
 import { TransactionModule } from './modules/transactions/transaction.module';
 import { UploadModule } from './modules/upload/upload.module';
-import { initCloudinary } from './config/cloudinary.config';
-import { SongModule } from './modules/song/song.module';
 
 @Module({
   imports: [
@@ -31,19 +33,18 @@ import { SongModule } from './modules/song/song.module';
       }),
       inject: [ConfigService],
     }),
-    AdminModule,
     UsersModule,
-    AttendanceModule,
     AuthModule,
+    AdminModule,
+    SongModule,
+    LeadershipShiftModule,
+    PerformanceModule,
+    RehearsalModule,
+    AttendanceModule,
     TransactionModule,
     UploadModule,
-    SongModule
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule implements OnModuleInit {
-  onModuleInit() {
-    // initCloudinary();
-  }
-}
+export class AppModule {}

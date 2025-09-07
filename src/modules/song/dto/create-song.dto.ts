@@ -1,18 +1,18 @@
-import { IsString, IsEnum, IsOptional, IsArray, IsDateString, IsInt, IsNumber } from 'class-validator';
+import { IsString, IsEnum, IsArray, IsOptional, IsInt, Min, MaxLength, IsDateString } from 'class-validator';
 import { SongDifficulty, SongStatus } from '../song.entity';
 
 export class CreateSongDto {
   @IsString()
+  @MaxLength(255)
   title: string;
 
   @IsString()
+  @MaxLength(255)
   composer: string;
 
   @IsString()
+  @MaxLength(100)
   genre: string;
-
-  @IsString()
-  duration: string;
 
   @IsEnum(SongDifficulty)
   difficulty: SongDifficulty;
@@ -20,16 +20,14 @@ export class CreateSongDto {
   @IsEnum(SongStatus)
   status: SongStatus;
 
-  @IsArray()
-  @IsString({ each: true })
-  voice_parts: string[];
-
   @IsString()
+  @MaxLength(10000)
   lyrics: string;
 
   @IsOptional()
   @IsInt()
-  times_performed?: number;
+  @Min(0)
+  times_performed?: number = 0;
 
   @IsOptional()
   @IsDateString()

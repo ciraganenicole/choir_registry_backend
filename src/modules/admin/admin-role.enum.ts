@@ -2,5 +2,4 @@ export enum AdminRole {
     SUPER_ADMIN = 'SUPER_ADMIN',
     ATTENDANCE_ADMIN = 'ATTENDANCE_ADMIN',
     FINANCE_ADMIN = 'FINANCE_ADMIN',
-    LEAD = 'LEAD',
 } 

@@ -11,6 +11,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { Transaction } from '../transactions/transaction.entity';
 import { ConfigService } from '@nestjs/config';
 import { TransactionType } from '../transactions/enums/transactions-categories.enum';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService implements OnModuleInit {
@@ -65,7 +66,6 @@ export class UsersService implements OnModuleInit {
                 ]
             });
         } catch (error: unknown) {
-            console.error('Error handling profile image:', error);
             if (error instanceof BadRequestException) {
                 throw error;
             }
@@ -176,6 +176,28 @@ export class UsersService implements OnModuleInit {
         return user;
     }
 
+    async findByIdForAuth(id: number): Promise<User> {
+        const user = await this.userRepository
+            .createQueryBuilder('user')
+            .select([
+                'user.id',
+                'user.email', 
+                'user.firstName', 
+                'user.lastName', 
+                'user.categories',
+                'user.isActive', 
+                'user.password'
+            ])
+            .where('user.id = :id', { id })
+            .getOne();
+
+        if (!user) {
+            throw new NotFoundException(`User with ID ${id} not found`);
+        }
+
+        return user;
+    }
+
     async getUserWithAttendanceAndTransactions(userId: number): Promise<User> {
         const user = await this.userRepository
             .createQueryBuilder('user')
@@ -197,7 +219,6 @@ export class UsersService implements OnModuleInit {
 
     async createUser(userData: CreateUserDto): Promise<User> {
         const queryRunner = this.userRepository.manager.connection.createQueryRunner();
-        
         try {
             await queryRunner.connect();
             await queryRunner.startTransaction();
@@ -205,6 +226,15 @@ export class UsersService implements OnModuleInit {
             // Set isActive to false if user is a NEWCOMER
             if (userData.categories?.includes(UserCategory.NEWCOMER)) {
                 userData.isActive = false;
+            }
+
+            // Note: User entity doesn't have a role property
+
+            // Ensure categories always includes 'NORMAL'
+            if (!userData.categories) {
+                userData.categories = [UserCategory.NORMAL];
+            } else if (!userData.categories.includes(UserCategory.NORMAL)) {
+                userData.categories = [UserCategory.NORMAL, ...userData.categories];
             }
 
             const user = this.userRepository.create(userData);
@@ -232,7 +262,66 @@ export class UsersService implements OnModuleInit {
     async updateUser(id: number, userData: UpdateUserDto): Promise<User> {
         const user = await this.findById(id);
         const oldData = { ...user };
+        
+        // Note: User entity doesn't have a role property
+        
+        // Ensure categories always includes 'NORMAL'
+        if (!userData.categories) {
+            userData.categories = [UserCategory.NORMAL];
+        } else if (!userData.categories.includes(UserCategory.NORMAL)) {
+            userData.categories = [UserCategory.NORMAL, ...userData.categories];
+        }
+        
+        // Check if LEAD category is being added or removed
+        const hadLeadCategory = oldData.categories?.includes(UserCategory.LEAD);
+        const hasLeadCategory = userData.categories?.includes(UserCategory.LEAD);
+        const isAddingLeadCategory = !hadLeadCategory && hasLeadCategory;
+        const isRemovingLeadCategory = hadLeadCategory && !hasLeadCategory;
+        
+        // If LEAD category is being removed, use query builder to ensure password is cleared
+        if (isRemovingLeadCategory) {
+            // Only include properties that exist in the User entity
+            const validUpdateData = {
+                firstName: userData.firstName,
+                lastName: userData.lastName,
+                gender: userData.gender,
+                maritalStatus: userData.maritalStatus,
+                educationLevel: userData.educationLevel,
+                profession: userData.profession,
+                competenceDomain: userData.competenceDomain,
+                churchOfOrigin: userData.churchOfOrigin,
+                commune: userData.commune,
+                quarter: userData.quarter,
+                reference: userData.reference,
+                address: userData.address,
+                phoneNumber: userData.phoneNumber,
+                whatsappNumber: userData.whatsappNumber,
+                email: userData.email,
+                phone: userData.phone,
+                categories: userData.categories,
+                password: undefined
+            };
+            
+            await this.userRepository
+                .createQueryBuilder()
+                .update(User)
+                .set(validUpdateData)
+                .where("id = :id", { id: user.id })
+                .execute();
+            
+            return await this.findById(id);
+        }
+        
+        // Update user data
         Object.assign(user, userData);
+        
+        // If LEAD category is being added and user doesn't have a password, generate one
+        if (isAddingLeadCategory && !user.password) {
+            const plainPassword = this.generatePassword(user.lastName);
+            const hashedPassword = await bcrypt.hash(plainPassword, 10);
+            user.password = hashedPassword;
+        }
+        
         const updatedUser = await this.userRepository.save(user);
 
         return updatedUser;
@@ -336,10 +425,132 @@ export class UsersService implements OnModuleInit {
         }
     }
 
-    async findByEmail(email: string): Promise<User | undefined> {
-        const user = await this.userRepository.findOne({ where: { email } });
-        return user || undefined;
+    // Generate password for LEAD users: lastName + currentYear
+    private generatePassword(lastName: string): string {
+        const currentYear = new Date().getFullYear();
+        return `${lastName.toLowerCase()}${currentYear}`;
     }
+
+    // Assign LEAD category and generate password for a user
+    async assignLeadRole(userId: number): Promise<{ user: User; password: string }> {
+        const user = await this.findById(userId);
+        if (!user) {
+            throw new NotFoundException(`User with id ${userId} not found`);
+        }
+
+        // Check if user already has LEAD category
+        const hasLeadCategory = user.categories?.includes(UserCategory.LEAD);
+        
+        // If user already has LEAD category and password, return existing info
+        if (hasLeadCategory && user.password) {
+            // Generate the same password to return it
+            const plainPassword = this.generatePassword(user.lastName);
+            return {
+                user: user,
+                password: plainPassword
+            };
+        }
+
+        // Generate password (for users without password or without LEAD category)
+        const plainPassword = this.generatePassword(user.lastName);
+        const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+        // Prepare update data
+        const updateData: any = {
+            password: hashedPassword
+        };
+
+        // If user doesn't have LEAD category, add it
+        if (!hasLeadCategory) {
+            const updatedCategories = user.categories ? [...user.categories, UserCategory.LEAD] : [UserCategory.LEAD];
+            updateData.categories = updatedCategories;
+        }
+
+        // Use query builder for more reliable update
+        const updateResult = await this.userRepository
+            .createQueryBuilder()
+            .update(User)
+            .set(updateData)
+            .where("id = :id", { id: userId })
+            .execute();
+
+        // Verify the update was successful
+        if (updateResult.affected === 0) {
+            throw new BadRequestException('Failed to update user. No rows were affected.');
+        }
+
+        // Return updated user and plain password
+        const updatedUser = await this.findById(userId);
+        if (!updatedUser) {
+            throw new NotFoundException('User not found after update');
+        }
+
+        return {
+            user: updatedUser,
+            password: plainPassword
+        };
+    }
+
+    // Remove LEAD category and clear password
+    async removeLeadRole(userId: number): Promise<User> {
+        const user = await this.findById(userId);
+        if (!user) {
+            throw new NotFoundException(`User with id ${userId} not found`);
+        }
+
+        // Check if user has LEAD category
+        if (!user.categories?.includes(UserCategory.LEAD)) {
+            throw new BadRequestException('User does not have LEAD category');
+        }
+
+        // Remove LEAD category and clear password
+        const updatedCategories = user.categories.filter(cat => cat !== UserCategory.LEAD);
+        
+        // Use query builder for more reliable update
+        const updateResult = await this.userRepository
+            .createQueryBuilder()
+            .update(User)
+            .set({
+                categories: updatedCategories,
+                password: undefined
+            })
+            .where("id = :id", { id: userId })
+            .execute();
+
+        // Verify the update was successful
+        if (updateResult.affected === 0) {
+            throw new BadRequestException('Failed to update user. No rows were affected.');
+        }
+
+        return await this.findById(userId);
+    }
+
+// Validate user credentials
+async validateUserCredentials(email: string, password: string): Promise<User | null> {
+    const user = await this.findByEmail(email);
+    if (!user || !user.isActive || !user.password) {
+        return null;
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    return isPasswordValid ? user : null;
+}
+
+// Get all LEAD users
+async getLeadUsers(): Promise<User[]> {
+    return this.userRepository
+        .createQueryBuilder('user')
+        .where("user.categories @> ARRAY[:leadCategory]", { leadCategory: UserCategory.LEAD })
+        .orderBy('user.lastName', 'ASC')
+        .getMany();
+}
+
+// Find user by email for authentication
+async findByEmail(email: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { email } });
+}
+
+
 
     async getUserContributionStats(userId: number, startDate?: Date, endDate?: Date): Promise<any> {
         const queryBuilder = this.transactionRepository

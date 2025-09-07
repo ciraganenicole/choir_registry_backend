@@ -19,22 +19,13 @@ const createAdmin = async () => {
   });
 
   try {
-    console.log('Connecting to database with settings:', {
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      username: process.env.DB_USERNAME,
-      database: process.env.DB_DATABASE,
-    });
 
     await dataSource.initialize();
-    console.log('Database connected successfully');
 
     const queryRunner = dataSource.createQueryRunner();
     const tableExists = await queryRunner.hasTable('admin_users');
-    console.log('admin_users table exists:', tableExists);
 
     if (!tableExists) {
-      console.log('Creating admin_users table...');
       await queryRunner.createTable(
         new Table({
           name: 'admin_users',
@@ -82,7 +73,6 @@ const createAdmin = async () => {
     const adminRepository = dataSource.getRepository(AdminUser);
     
     const existingAdmins = await adminRepository.find();
-    console.log('Existing admins:', existingAdmins);
 
     const hashedPassword = await bcrypt.hash('password123', 10);
 
@@ -118,7 +108,6 @@ const createAdmin = async () => {
             isActive: true,
           });
           await adminRepository.save(admin);
-          console.log(`Created admin: ${adminData.email}`);
         } else {
           console.log(`Admin already exists: ${adminData.email}`);
         }

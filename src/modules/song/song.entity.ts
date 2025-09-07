@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { AdminUser } from '../admin/admin_users.entity';
+import { User } from '../users/user.entity';
 
 export enum SongDifficulty {
   EASY = 'Easy',
@@ -15,8 +15,8 @@ export enum SongStatus {
 
 @Entity('songs')
 export class Song {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
   @Column()
   title: string;
@@ -27,23 +27,19 @@ export class Song {
   @Column()
   genre: string;
 
-  @Column()
-  duration: string;
-
   @Column({
     type: 'enum',
     enum: SongDifficulty,
+    enumName: 'song_difficulty_enum',
   })
   difficulty: SongDifficulty;
 
   @Column({
     type: 'enum',
     enum: SongStatus,
+    enumName: 'song_status_enum',
   })
   status: SongStatus;
-
-  @Column('text', { array: true })
-  voice_parts: string[];
 
   @Column('text')
   lyrics: string;
@@ -60,10 +56,10 @@ export class Song {
   @UpdateDateColumn({ type: 'timestamp with time zone' })
   updated_at: Date;
 
-  @ManyToOne(() => AdminUser, { nullable: false })
+  @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'addedById' })
-  added_by: AdminUser;
+  added_by?: User;
 
-  @Column()
-  addedById: string;
+  @Column({ nullable: true })
+  addedById?: number;
 } 
