@@ -275,36 +275,30 @@ export class TransactionService {
     };
   }
 
-  async getStats(startDate?: Date | string, endDate?: Date | string) {
-    // If no dates provided, default to current month
-    const currentMonthStart = startOfMonth(new Date());
-    const currentMonthEnd = endOfMonth(new Date());
-
-    const startDateStr = startDate 
-      ? (typeof startDate === 'string' 
-        ? startDate.split('T')[0]
-        : new Date(startDate).toISOString().split('T')[0])
-      : currentMonthStart.toISOString().split('T')[0];
-    const endDateStr = endDate
-      ? (typeof endDate === 'string'
-        ? endDate.split('T')[0]
-        : new Date(endDate).toISOString().split('T')[0])
-      : currentMonthEnd.toISOString().split('T')[0];
-
-    console.log('Date Filter Debug:', {
-      inputStartDate: startDate,
-      inputEndDate: endDate,
-      formattedStartDate: startDateStr,
-      formattedEndDate: endDateStr,
-      currentMonthStart: currentMonthStart.toISOString().split('T')[0],
-      currentMonthEnd: currentMonthEnd.toISOString().split('T')[0]
-    });
-
+  async getStats(startDate?: Date | string, endDate?: Date | string, filterDto?: TransactionFilterDto) {
+    // Build query without default date filtering
     const query = this.transactionRepository.createQueryBuilder('transaction');
+    
+    // Only apply date filtering if dates are explicitly provided
+    if (startDate || endDate) {
+      const startDateStr = startDate 
+        ? (typeof startDate === 'string' 
+          ? startDate.split('T')[0]
+          : new Date(startDate).toISOString().split('T')[0])
+        : undefined;
+      const endDateStr = endDate
+        ? (typeof endDate === 'string'
+          ? endDate.split('T')[0]
+          : new Date(endDate).toISOString().split('T')[0])
+        : undefined;
 
-    // Use >= for start date and <= for end date since we're working with a date column
-    query.andWhere('transaction.transactionDate >= :startDate', { startDate: startDateStr })
-         .andWhere('transaction.transactionDate <= :endDate', { endDate: endDateStr });
+      if (startDateStr) {
+        query.andWhere('transaction.transactionDate >= :startDate', { startDate: startDateStr });
+      }
+      if (endDateStr) {
+        query.andWhere('transaction.transactionDate <= :endDate', { endDate: endDateStr });
+      }
+    }
 
     // Apply additional filters if provided
     if (filterDto) {
@@ -374,20 +368,46 @@ export class TransactionService {
       return acc;
     }, {} as Record<string, { income: { usd: number; fc: number }, expense: { usd: number; fc: number }, solde: { usd: number; fc: number } }>);
 
-    // Calculate daily totals using the provided date range
-    const dailyTotalUSD = usdTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const dailyTotalFC = fcTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    // Calculate overall solde
+    const solde = {
+      usd: totalIncome.usd - totalExpense.usd,
+      fc: totalIncome.fc - totalExpense.fc
+    };
 
-    console.log('Stats Summary:', {
-      usdTotal,
-      fcTotal,
-      monthlyBreakdown,
-      monthlyBreakdownKeys: Object.keys(monthlyBreakdown),
-      dailyTotalUSD,
-      dailyTotalFC
-    });
+    // For backward compatibility, but only for DAILY category
+    const dailyUSDTransactions = transactions.filter(t => t.currency === Currency.USD && t.category === 'DAILY');
+    const dailyFCTransactions = transactions.filter(t => t.currency === Currency.FC && t.category === 'DAILY');
+    const dailyTotalUSD = dailyUSDTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const dailyTotalFC = dailyFCTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
-    return {
+    // Determine date range for response
+    let dateRange;
+    if (startDate || endDate) {
+      const startDateStr = startDate 
+        ? (typeof startDate === 'string' 
+          ? startDate.split('T')[0]
+          : new Date(startDate).toISOString().split('T')[0])
+        : undefined;
+      const endDateStr = endDate
+        ? (typeof endDate === 'string'
+          ? endDate.split('T')[0]
+          : new Date(endDate).toISOString().split('T')[0])
+        : undefined;
+      
+      dateRange = {
+        from: startDateStr ? new Date(startDateStr) : null,
+        to: endDateStr ? new Date(endDateStr) : null
+      };
+    } else {
+      // If no date filter, show the full range of available data
+      const allDates = transactions.map(t => new Date(t.transactionDate)).sort((a, b) => a.getTime() - b.getTime());
+      dateRange = {
+        from: allDates.length > 0 ? allDates[0] : null,
+        to: allDates.length > 0 ? allDates[allDates.length - 1] : null
+      };
+    }
+
+    const result = {
       totals: {
         income: totalIncome,
         expense: totalExpense,
@@ -616,4 +636,4 @@ export class TransactionService {
       throw new BadRequestException('Failed to fetch daily contributions. Please check your input parameters.');
     }
   }
-} 
+}
