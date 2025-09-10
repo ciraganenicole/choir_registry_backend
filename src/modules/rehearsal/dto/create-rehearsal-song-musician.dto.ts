@@ -7,9 +7,15 @@ export class CreateRehearsalSongMusicianDto {
 
   @IsOptional()
   @IsString()
+  musicianName?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @IsOptional()
+  @IsString()
   instrument?: string;
-
-
 
   @IsOptional()
   @IsString()

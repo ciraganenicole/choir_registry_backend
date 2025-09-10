@@ -2,7 +2,6 @@ import { Controller, Post, UseInterceptors, UploadedFile, BadRequestException } 
 import { FileInterceptor } from '@nestjs/platform-express';
 import { uploadToCloudinary } from '../../config/cloudinary.config';
 import * as multer from 'multer';
-import { extname } from 'path';
 import * as fs from 'fs';
 
 @Controller('upload')
@@ -49,11 +48,9 @@ export class UploadController {
       // Clean up the temporary file in case of error
       if (file.path) {
         fs.unlink(file.path, (err) => {
-          if (err) console.error('Error deleting temporary file:', err);
+          // Silently handle file deletion errors
         });
       }
-      
-      console.error('Upload error:', error);
       throw new BadRequestException(
         error?.message || 'Failed to upload image'
       );

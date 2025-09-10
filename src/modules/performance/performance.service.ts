@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Performance, PerformanceType, PerformanceStatus } from './performance.entity';
 import { PerformanceSong } from './performance-song.entity';
 import { PerformanceSongMusician, InstrumentType } from './performance-song-musician.entity';
@@ -429,11 +429,247 @@ export class PerformanceService {
   }
 
   /**
+   * Promote multiple rehearsals to populate their linked performances with detailed data
+   * This method copies all the detailed information from multiple rehearsals to their respective performances
+   * Songs are added to performances, not replaced (duplicates are skipped)
+   */
+  async promoteRehearsals(
+    rehearsalIds: number[], 
+    userId: number, 
+    userType: string, 
+    userRole?: string
+  ): Promise<{ success: number; errors: Array<{ rehearsalId: number; error: string }> }> {
+    // Check permissions
+    const isSuperAdmin = userType === 'admin' && userRole === AdminRole.SUPER_ADMIN;
+    
+    if (!isSuperAdmin) {
+      const user = await this.userRepository.findOneBy({ id: userId });
+      if (!user) {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+
+      if (user.categories?.includes(UserCategory.LEAD)) {
+        await this.leadershipShiftService.checkUserOnActiveShift(userId);
+      } else {
+        throw new ForbiddenException('Only SUPER_ADMIN users or LEAD users on active shift can promote rehearsals');
+      }
+    }
+
+    if (!rehearsalIds || rehearsalIds.length === 0) {
+      throw new BadRequestException('At least one rehearsal ID must be provided');
+    }
+
+    const results = {
+      success: 0,
+      errors: [] as Array<{ rehearsalId: number; error: string }>
+    };
+
+    // Process each rehearsal
+    for (const rehearsalId of rehearsalIds) {
+      try {
+        // Validate rehearsal status before attempting promotion
+        const rehearsal = await this.rehearsalService.findOne(rehearsalId);
+        if (rehearsal.status !== 'Completed') {
+          throw new BadRequestException(`Rehearsal ${rehearsalId} must be completed before promotion. Current status: ${rehearsal.status}`);
+        }
+        
+        await this.promoteRehearsal(rehearsalId, userId, userType, userRole);
+        results.success++;
+      } catch (error) {
+        results.errors.push({
+          rehearsalId,
+          error: error instanceof Error ? error.message : 'Unknown error occurred'
+        });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Replace all performance songs with rehearsal songs (clears existing and adds new)
+   */
+  async replaceRehearsal(
+    rehearsalId: number, 
+    userId: number, 
+    userType: string, 
+    userRole?: string
+  ): Promise<Performance> {
+    // Check permissions
+    const isSuperAdmin = userType === 'admin' && userRole === AdminRole.SUPER_ADMIN;
+    
+    if (!isSuperAdmin) {
+      const user = await this.userRepository.findOneBy({ id: userId });
+      if (!user) {
+        throw new NotFoundException(`User with ID ${userId} not found`);
+      }
+
+      if (user.categories?.includes(UserCategory.LEAD)) {
+        await this.leadershipShiftService.checkUserOnActiveShift(userId);
+      } else {
+        throw new ForbiddenException('Only SUPER_ADMIN users or LEAD users on active shift can replace rehearsals');
+      }
+    }
+
+    // Get the rehearsal with all its details first
+    const rehearsal = await this.rehearsalService.findOne(rehearsalId);
+    
+    // Validate rehearsal status - only completed rehearsals can be promoted
+    if (rehearsal.status !== 'Completed') {
+      throw new BadRequestException(`Rehearsal ${rehearsalId} must be completed before promotion. Current status: ${rehearsal.status}`);
+    }
+    
+    // Get the performance ID from the rehearsal
+    const performanceId = rehearsal.performanceId;
+    
+    if (!performanceId) {
+      throw new BadRequestException(`Rehearsal ${rehearsalId} is not linked to any performance`);
+    }
+    
+    // Get the performance
+    const performance = await this.findOne(performanceId);
+    
+    // Check if performance is in preparation status
+    if (performance.status !== PerformanceStatus.IN_PREPARATION) {
+      throw new BadRequestException(`Performance must be in 'in_preparation' status to replace with rehearsal. Current status: ${performance.status}`);
+    }
+    
+    // Use a transaction to ensure data consistency
+    return await this.performanceRepository.manager.transaction(async (transactionalEntityManager) => {
+      // Validate performanceId is a valid number
+      if (!Number.isInteger(performanceId) || performanceId <= 0) {
+        throw new BadRequestException(`Invalid performanceId: ${performanceId}. Must be a positive integer.`);
+      }
+
+      // Delete all existing performance songs and related data
+      const existingSongs = await transactionalEntityManager.find(PerformanceSong, { 
+        where: { performanceId } 
+      });
+      
+      const existingSongIds = existingSongs.map(song => song.id);
+
+      if (existingSongIds.length > 0) {
+        // Delete related musicians
+        await transactionalEntityManager
+          .createQueryBuilder()
+          .delete()
+          .from(PerformanceSongMusician)
+          .where('"performanceSongId" IN (:...songIds)', { songIds: existingSongIds })
+          .execute();
+
+        // Delete related voice parts
+        await transactionalEntityManager
+          .createQueryBuilder()
+          .delete()
+          .from(PerformanceVoicePart)
+          .where('"performanceSongId" IN (:...songIds)', { songIds: existingSongIds })
+          .execute();
+
+        // Delete the performance songs
+        await transactionalEntityManager
+          .createQueryBuilder()
+          .delete()
+          .from(PerformanceSong)
+          .where('id IN (:...songIds)', { songIds: existingSongIds })
+          .execute();
+      }
+
+      // Check if rehearsal has songs
+      if (!rehearsal.rehearsalSongs || rehearsal.rehearsalSongs.length === 0) {
+        throw new BadRequestException('Rehearsal must contain at least one song to replace');
+      }
+
+      // Add all rehearsal songs (no duplicate checking since we cleared existing)
+      for (const rehearsalSong of rehearsal.rehearsalSongs) {
+        // Validate rehearsal song has required data
+        if (!rehearsalSong.song || !rehearsalSong.song.id) {
+          throw new BadRequestException('Rehearsal song must have a valid song reference');
+        }
+
+        // Create performance song
+        const performanceSong = transactionalEntityManager.create(PerformanceSong, {
+          performanceId: performanceId,
+          songId: rehearsalSong.song.id,
+          leadSingerId: rehearsalSong.leadSinger?.[0]?.id,
+          notes: rehearsalSong.notes,
+          order: rehearsalSong.order,
+          timeAllocated: rehearsalSong.timeAllocated,
+          focusPoints: rehearsalSong.focusPoints,
+          musicalKey: rehearsalSong.musicalKey,
+        });
+        
+        const savedPerformanceSong = await transactionalEntityManager.save(performanceSong);
+
+        // Copy musicians
+        if (rehearsalSong.musicians && rehearsalSong.musicians.length > 0) {
+          for (const musician of rehearsalSong.musicians) {
+            const performanceMusician = transactionalEntityManager.create(PerformanceSongMusician, {
+              performanceSongId: savedPerformanceSong.id,
+              userId: musician.user?.id,
+              instrument: this.mapInstrumentToEnum(musician.instrument),
+              notes: musician.notes,
+              practiceNotes: musician.practiceNotes,
+              needsPractice: musician.needsPractice,
+              isSoloist: musician.isSoloist,
+              isAccompanist: musician.isAccompanist,
+              soloStartTime: musician.soloStartTime,
+              soloEndTime: musician.soloEndTime,
+              soloNotes: musician.soloNotes,
+              accompanimentNotes: musician.accompanimentNotes,
+              order: musician.order,
+              timeAllocated: musician.timeAllocated,
+            });
+
+            await transactionalEntityManager.save(performanceMusician);
+          }
+        }
+
+        // Copy voice parts
+        if (rehearsalSong.voiceParts && rehearsalSong.voiceParts.length > 0) {
+          for (const voicePart of rehearsalSong.voiceParts) {
+            const performanceVoicePart = transactionalEntityManager.create(PerformanceVoicePart, {
+              performanceSongId: savedPerformanceSong.id,
+              type: voicePart.voicePartType,
+              needsWork: voicePart.needsWork,
+              focusPoints: voicePart.focusPoints,
+              notes: voicePart.notes,
+              order: voicePart.order,
+              timeAllocated: voicePart.timeAllocated,
+            });
+
+            const savedPerformanceVoicePart = await transactionalEntityManager.save(performanceVoicePart);
+
+            // Copy voice part members
+            if (voicePart.members && voicePart.members.length > 0) {
+              const memberInserts = voicePart.members.map(member => ({
+                performanceVoicePartId: savedPerformanceVoicePart.id,
+                userId: member.id
+              }));
+
+              if (memberInserts.length > 0) {
+                await transactionalEntityManager
+                  .createQueryBuilder()
+                  .insert()
+                  .into('performance_voice_part_members')
+                  .values(memberInserts)
+                  .execute();
+              }
+            }
+          }
+        }
+      }
+
+      // Return the performance without changing its status
+      return this.findOne(performanceId);
+    });
+  }
+
+  /**
    * Promote a rehearsal to populate the performance with detailed data
    * This method copies all the detailed information from a rehearsal to the performance
+   * Songs are added to the performance, duplicates are skipped
    */
   async promoteRehearsal(
-    performanceId: number, 
     rehearsalId: number, 
     userId: number, 
     userType: string, 
@@ -456,6 +692,21 @@ export class PerformanceService {
       }
     }
 
+    // Get the rehearsal with all its details first
+    const rehearsal = await this.rehearsalService.findOne(rehearsalId);
+    
+    // Validate rehearsal status - only completed rehearsals can be promoted
+    if (rehearsal.status !== 'Completed') {
+      throw new BadRequestException(`Rehearsal ${rehearsalId} must be completed before promotion. Current status: ${rehearsal.status}`);
+    }
+    
+    // Get the performance ID from the rehearsal
+    const performanceId = rehearsal.performanceId;
+    
+    if (!performanceId) {
+      throw new BadRequestException(`Rehearsal ${rehearsalId} is not linked to any performance`);
+    }
+    
     // Get the performance
     const performance = await this.findOne(performanceId);
     
@@ -463,62 +714,41 @@ export class PerformanceService {
     if (performance.status !== PerformanceStatus.IN_PREPARATION) {
       throw new BadRequestException(`Performance must be in 'in_preparation' status to promote a rehearsal. Current status: ${performance.status}`);
     }
-
-    // Get the rehearsal with all its details
-    const rehearsal = await this.rehearsalService.findOne(rehearsalId);
     
-    // Verify the rehearsal belongs to this performance
-    if (rehearsal.performanceId !== performanceId) {
-      throw new BadRequestException(`Rehearsal ${rehearsalId} does not belong to performance ${performanceId}`);
-    }
-
     // Use a transaction to ensure data consistency
     return await this.performanceRepository.manager.transaction(async (transactionalEntityManager) => {
-      // First, let's check what existing performance songs exist
+      // Validate performanceId is a valid number
+      if (!Number.isInteger(performanceId) || performanceId <= 0) {
+        throw new BadRequestException(`Invalid performanceId: ${performanceId}. Must be a positive integer.`);
+      }
+
+      // Check for duplicate songs to avoid adding the same song twice
       const existingSongs = await transactionalEntityManager.find(PerformanceSong, { 
         where: { performanceId } 
       });
-      // Get the IDs of existing performance songs first
-      const existingSongIds = existingSongs.map(song => song.id);
+      
+      const existingSongIds = new Set(existingSongs.map(song => song.songId));
 
-      if (existingSongIds.length > 0) {
-        // Delete related musicians
-        const relatedMusicians = await transactionalEntityManager
-          .createQueryBuilder()
-          .delete()
-          .from(PerformanceSongMusician)
-          .where('"performanceSongId" IN (:...songIds)', { songIds: existingSongIds })
-          .execute();
-
-        // Delete related voice parts
-        const relatedVoiceParts = await transactionalEntityManager
-          .createQueryBuilder()
-          .delete()
-          .from(PerformanceVoicePart)
-          .where('"performanceSongId" IN (:...songIds)', { songIds: existingSongIds })
-          .execute();
-
-        // Delete the performance songs
-        const deletedCount = await transactionalEntityManager
-          .createQueryBuilder()
-          .delete()
-          .from(PerformanceSong)
-          .where('id IN (:...songIds)', { songIds: existingSongIds })
-          .execute();
-      } else {
-        console.log('ℹ️ No existing performance songs to delete');
-      }
+    // Check if rehearsal has songs
+    if (!rehearsal.rehearsalSongs || rehearsal.rehearsalSongs.length === 0) {
+      throw new BadRequestException('Rehearsal must contain at least one song to promote');
+    }
 
     for (const rehearsalSong of rehearsal.rehearsalSongs) {
-
-      // Validate performanceId before creating entity
-      if (!performanceId || performanceId === undefined || performanceId === null) {
-        throw new Error(`Invalid performanceId: ${performanceId}`);
+      // Validate rehearsal song has required data
+      if (!rehearsalSong.song || !rehearsalSong.song.id) {
+        throw new BadRequestException('Rehearsal song must have a valid song reference');
       }
 
-      // Create performance song - ensure no ID is passed to avoid update conflicts
-      const performanceSongData = {
-        performanceId: performanceId, // Explicitly use the parameter
+      // Skip if this song already exists in the performance
+      if (existingSongIds.has(rehearsalSong.song.id)) {
+        console.log(`Skipping duplicate song: ${rehearsalSong.song.title || rehearsalSong.song.id}`);
+        continue;
+      }
+
+      // Create performance song using entity manager to avoid conflicts
+      const performanceSong = transactionalEntityManager.create(PerformanceSong, {
+        performanceId: performanceId,
         songId: rehearsalSong.song.id,
         leadSingerId: rehearsalSong.leadSinger?.[0]?.id,
         notes: rehearsalSong.notes,
@@ -526,26 +756,14 @@ export class PerformanceService {
         timeAllocated: rehearsalSong.timeAllocated,
         focusPoints: rehearsalSong.focusPoints,
         musicalKey: rehearsalSong.musicalKey,
-      };
-      // Ensure no ID is present in the data to avoid update conflicts
-      const cleanPerformanceSongData = { ...performanceSongData };
-      delete (cleanPerformanceSongData as any).id; // Remove any potential ID field
-
-      // Use insert instead of create/save to avoid any ID conflicts
-      const insertResult = await transactionalEntityManager
-        .createQueryBuilder()
-        .insert()
-        .into(PerformanceSong)
-        .values(cleanPerformanceSongData)
-        .returning('*')
-        .execute();
+      });
       
-      const savedPerformanceSong = insertResult.raw[0];
+      const savedPerformanceSong = await transactionalEntityManager.save(performanceSong);
 
       // Copy musicians
       if (rehearsalSong.musicians && rehearsalSong.musicians.length > 0) {
         for (const musician of rehearsalSong.musicians) {
-          const musicianData = {
+          const performanceMusician = transactionalEntityManager.create(PerformanceSongMusician, {
             performanceSongId: savedPerformanceSong.id,
             userId: musician.user?.id,
             instrument: this.mapInstrumentToEnum(musician.instrument),
@@ -560,21 +778,16 @@ export class PerformanceService {
             accompanimentNotes: musician.accompanimentNotes,
             order: musician.order,
             timeAllocated: musician.timeAllocated,
-          };
+          });
 
-          await transactionalEntityManager
-            .createQueryBuilder()
-            .insert()
-            .into(PerformanceSongMusician)
-            .values(musicianData)
-            .execute();
+          await transactionalEntityManager.save(performanceMusician);
         }
       }
 
       // Copy voice parts
       if (rehearsalSong.voiceParts && rehearsalSong.voiceParts.length > 0) {
         for (const voicePart of rehearsalSong.voiceParts) {
-          const voicePartData = {
+          const performanceVoicePart = transactionalEntityManager.create(PerformanceVoicePart, {
             performanceSongId: savedPerformanceSong.id,
             type: voicePart.voicePartType,
             needsWork: voicePart.needsWork,
@@ -582,17 +795,9 @@ export class PerformanceService {
             notes: voicePart.notes,
             order: voicePart.order,
             timeAllocated: voicePart.timeAllocated,
-          };
+          });
 
-          const insertResult = await transactionalEntityManager
-            .createQueryBuilder()
-            .insert()
-            .into(PerformanceVoicePart)
-            .values(voicePartData)
-            .returning('*')
-            .execute();
-
-          const savedPerformanceVoicePart = insertResult.raw[0];
+          const savedPerformanceVoicePart = await transactionalEntityManager.save(performanceVoicePart);
 
           // Copy voice part members
           if (voicePart.members && voicePart.members.length > 0) {
@@ -615,12 +820,51 @@ export class PerformanceService {
       }
     }
 
-      // Update performance status to ready
-      performance.status = PerformanceStatus.READY;
-      await transactionalEntityManager.save(Performance, performance);
-
+      // Return the performance without changing its status
+      // Let the user manually update the status when ready
       return this.findOne(performanceId);
     });
+  }
+
+  /**
+   * Get rehearsals that can be promoted (completed rehearsals linked to performances in preparation status)
+   */
+  async getPromotableRehearsals(): Promise<Array<{ id: number; title: string; performanceId: number; performanceTitle: string; rehearsalDate: Date; status: string }>> {
+    const rehearsals = await this.rehearsalService.findAll({
+      page: 1,
+      limit: 1000, // Get all rehearsals
+      status: 'completed' as any // Only completed rehearsals can be promoted
+    });
+
+    const promotableRehearsals = [];
+
+    for (const rehearsal of rehearsals[0]) {
+      // Double-check that rehearsal is completed
+      if (rehearsal.status !== 'Completed') {
+        continue;
+      }
+      
+      if (rehearsal.performanceId) {
+        try {
+          const performance = await this.findOne(rehearsal.performanceId);
+          if (performance.status === PerformanceStatus.IN_PREPARATION) {
+            promotableRehearsals.push({
+              id: rehearsal.id,
+              title: rehearsal.title || `Rehearsal ${rehearsal.id}`,
+              performanceId: rehearsal.performanceId,
+              performanceTitle: performance.location || `Performance ${rehearsal.performanceId}`,
+              rehearsalDate: rehearsal.date,
+              status: rehearsal.status
+            });
+          }
+        } catch (error) {
+          // Skip rehearsals linked to non-existent performances
+          continue;
+        }
+      }
+    }
+
+    return promotableRehearsals;
   }
 
   private async validateSingleActiveShift(): Promise<{ isValid: boolean; activeShifts: LeadershipShift[] }> {

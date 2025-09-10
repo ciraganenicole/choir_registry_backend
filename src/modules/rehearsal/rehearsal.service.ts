@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder, In } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Rehearsal, RehearsalType, RehearsalStatus } from './rehearsal.entity';
 import { RehearsalSong } from './rehearsal-song.entity';
 import { RehearsalSongMusician } from './rehearsal-song-musician.entity';
@@ -9,7 +9,7 @@ import { Song } from '../song/song.entity';
 import { User } from '../users/user.entity';
 import { UserCategory } from '../users/enums/user-category.enum';
 import { AdminRole } from '../admin/admin-role.enum';
-import { LeadershipShift, ShiftStatus } from '../leadership-shift/leadership-shift.entity';
+import { LeadershipShift } from '../leadership-shift/leadership-shift.entity';
 import { LeadershipShiftService } from '../leadership-shift/leadership-shift.service';
 import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
 import { CreateRehearsalSongDto } from './dto/create-rehearsal-song.dto';
@@ -155,6 +155,8 @@ export class RehearsalService {
             const musician = this.rehearsalSongMusicianRepository.create({
               rehearsalSong: { id: savedRehearsalSong.id } as RehearsalSong,
               user: { id: musicianDto.userId } as User,
+              musicianName: musicianDto.musicianName,
+              role: musicianDto.role,
               instrument: musicianDto.instrument,
               notes: musicianDto.notes,
               practiceNotes: musicianDto.practiceNotes,
@@ -264,50 +266,40 @@ export class RehearsalService {
 
     queryBuilder.skip(skip).take(limit);
 
-    try {
-      const result = await queryBuilder.getManyAndCount();
-      
-      return result;
-    } catch (error) {
-      throw error;
-    }
+    const result = await queryBuilder.getManyAndCount();
+    return result;
   }
 
   async findOne(id: number): Promise<Rehearsal> {
-    
-    try {
-      const rehearsal = await this.rehearsalRepository.findOne({
-        where: { id },
-        relations: [
-          'performance',
-          'rehearsalLead',
-          'shiftLead',
-          'choirMembers',
-          'rehearsalSongs',
-          'rehearsalSongs.song',
-          'rehearsalSongs.leadSinger',
-          'rehearsalSongs.chorusMembers',
-          'rehearsalSongs.musicians',
-          'rehearsalSongs.musicians.user',
-          'rehearsalSongs.voiceParts',
-          'rehearsalSongs.voiceParts.members',
-          'created_by',
-        ],
-        order: {
-          rehearsalSongs: {
-            order: 'ASC',
-          },
+    const rehearsal = await this.rehearsalRepository.findOne({
+      where: { id },
+      relations: [
+        'performance',
+        'rehearsalLead',
+        'shiftLead',
+        'choirMembers',
+        'rehearsalSongs',
+        'rehearsalSongs.song',
+        'rehearsalSongs.leadSinger',
+        'rehearsalSongs.chorusMembers',
+        'rehearsalSongs.musicians',
+        'rehearsalSongs.musicians.user',
+        'rehearsalSongs.voiceParts',
+        'rehearsalSongs.voiceParts.members',
+        'created_by',
+      ],
+      order: {
+        rehearsalSongs: {
+          order: 'ASC',
         },
-      });
+      },
+    });
 
-      if (!rehearsal) {
-        throw new NotFoundException(`Rehearsal with ID ${id} not found`);
-      }
-      
-      return rehearsal;
-    } catch (error) {
-      throw error;
+    if (!rehearsal) {
+      throw new NotFoundException(`Rehearsal with ID ${id} not found`);
     }
+    
+    return rehearsal;
   }
 
   async update(id: number, updateRehearsalDto: UpdateRehearsalDto, userId: number, userType: string, userRole?: string): Promise<Rehearsal> {
@@ -424,208 +416,175 @@ export class RehearsalService {
   }
 
   async findByUser(userId: number): Promise<Rehearsal[]> {
+    const rehearsals = await this.rehearsalRepository.find({
+      where: [
+        { createdById: userId },
+        { shiftLeadId: userId },
+        { rehearsalLeadId: userId },
+      ],
+      relations: [
+        'performance',
+        'rehearsalLead',
+        'shiftLead',
+        'choirMembers',
+        'rehearsalSongs',
+        'rehearsalSongs.song',
+        'rehearsalSongs.leadSinger',
+        'rehearsalSongs.chorusMembers',
+        'rehearsalSongs.musicians',
+        'rehearsalSongs.musicians.user',
+        'rehearsalSongs.voiceParts',
+        'rehearsalSongs.voiceParts.members',
+        'created_by',
+      ],
+      order: { date: 'DESC' },
+    });
     
-    try {
-      const rehearsals = await this.rehearsalRepository.find({
-        where: [
-          { createdById: userId },
-          { shiftLeadId: userId },
-          { rehearsalLeadId: userId },
-        ],
-        relations: [
-          'performance',
-          'rehearsalLead',
-          'shiftLead',
-          'choirMembers',
-          'rehearsalSongs',
-          'rehearsalSongs.song',
-          'rehearsalSongs.leadSinger',
-          'rehearsalSongs.chorusMembers',
-          'rehearsalSongs.musicians',
-          'rehearsalSongs.musicians.user',
-          'rehearsalSongs.voiceParts',
-          'rehearsalSongs.voiceParts.members',
-          'created_by',
-        ],
-        order: { date: 'DESC' },
-      });
-      
-      return rehearsals;
-    } catch (error) {
-      throw error;
-    }
+    return rehearsals;
   }
 
   /**
    * Debug method to get all rehearsals without any filters
    */
   async getAllRehearsalsDebug(): Promise<Rehearsal[]> {
+    // Simple query without complex joins for debugging
+    const rehearsals = await this.rehearsalRepository.find({
+      relations: ['performance', 'rehearsalLead', 'shiftLead'],
+      order: { date: 'DESC' },
+    });
     
-    try {
-      // Simple query without complex joins for debugging
-      const rehearsals = await this.rehearsalRepository.find({
-        relations: ['performance', 'rehearsalLead', 'shiftLead'],
-        order: { date: 'DESC' },
-      });
-      
-      if (rehearsals.length > 0) {
-        rehearsals.forEach((rehearsal, index) => {
-        });
-      } else {
-        console.log('⚠️  No rehearsals found in database at all');
-      }
-      
-      return rehearsals;
-    } catch (error) {
-      throw error;
-    }
+    return rehearsals;
   }
 
   /**
    * Raw database query to check rehearsals table directly
    */
   async getRawRehearsalsDebug(): Promise<any[]> {
+    // Use query builder for raw query
+    const rawRehearsals = await this.rehearsalRepository
+      .createQueryBuilder('rehearsal')
+      .select([
+        'rehearsal.id',
+        'rehearsal.title',
+        'rehearsal.date',
+        'rehearsal.type',
+        'rehearsal.status',
+        'rehearsal.performanceId',
+        'rehearsal.rehearsalLeadId',
+        'rehearsal.shiftLeadId',
+        'rehearsal.createdById'
+      ])
+      .getRawMany();
     
-    try {
-      // Use query builder for raw query
-      const rawRehearsals = await this.rehearsalRepository
-        .createQueryBuilder('rehearsal')
-        .select([
-          'rehearsal.id',
-          'rehearsal.title',
-          'rehearsal.date',
-          'rehearsal.type',
-          'rehearsal.status',
-          'rehearsal.performanceId',
-          'rehearsal.rehearsalLeadId',
-          'rehearsal.shiftLeadId',
-          'rehearsal.createdById'
-        ])
-        .getRawMany();
-      if (rawRehearsals.length > 0) {
-        rawRehearsals.forEach((rehearsal, index) => {
-        });
-      } else {
-        console.log('⚠️  No raw rehearsals found in database');
-      }
-      
-      return rawRehearsals;
-    } catch (error) {
-      throw error;
-    }
+    return rawRehearsals;
   }
 
   /**
    * Get rehearsal songs with clear separation of song library and rehearsal data
    */
   async getRehearsalSongs(rehearsalId: number): Promise<any> {
+    const rehearsal = await this.findOne(rehearsalId);
     
-    try {
-      const rehearsal = await this.findOne(rehearsalId);
-      
-      const result = {
-        rehearsalInfo: {
-          id: rehearsal.id,
-          title: rehearsal.title,
-          date: rehearsal.date,
-          type: rehearsal.type,
-          status: rehearsal.status,
-          performanceId: rehearsal.performanceId,
-          rehearsalLeadId: rehearsal.rehearsalLeadId,
-          shiftLeadId: rehearsal.shiftLeadId,
-          location: rehearsal.location,
-          duration: rehearsal.duration,
-          notes: rehearsal.notes,
-          objectives: rehearsal.objectives,
-          isTemplate: rehearsal.isTemplate
+    const result = {
+      rehearsalInfo: {
+        id: rehearsal.id,
+        title: rehearsal.title,
+        date: rehearsal.date,
+        type: rehearsal.type,
+        status: rehearsal.status,
+        performanceId: rehearsal.performanceId,
+        rehearsalLeadId: rehearsal.rehearsalLeadId,
+        shiftLeadId: rehearsal.shiftLeadId,
+        location: rehearsal.location,
+        duration: rehearsal.duration,
+        notes: rehearsal.notes,
+        objectives: rehearsal.objectives,
+        isTemplate: rehearsal.isTemplate
+      },
+      rehearsalSongs: rehearsal.rehearsalSongs?.map(song => ({
+        rehearsalSongId: song.id,
+        // Song library info (read-only, general song data)
+        songLibrary: {
+          id: song.song.id,
+          title: song.song.title,
+          composer: song.song.composer,
+          genre: song.song.genre,
+          difficulty: song.song.difficulty,
+          status: song.song.status,
+          lyrics: song.song.lyrics,
+          times_performed: song.song.times_performed,
+          last_performed: song.song.last_performed,
+          created_at: song.song.created_at,
+          updated_at: song.song.updated_at,
+          addedById: song.song.addedById
         },
-        rehearsalSongs: rehearsal.rehearsalSongs?.map(song => ({
-          rehearsalSongId: song.id,
-          // Song library info (read-only, general song data)
-          songLibrary: {
-            id: song.song.id,
-            title: song.song.title,
-            composer: song.song.composer,
-            genre: song.song.genre,
-            difficulty: song.song.difficulty,
-            status: song.song.status,
-            lyrics: song.song.lyrics,
-            times_performed: song.song.times_performed,
-            last_performed: song.song.last_performed,
-            created_at: song.song.created_at,
-            updated_at: song.song.updated_at,
-            addedById: song.song.addedById
-          },
-          // Rehearsal-specific info (editable, rehearsal context)
-          rehearsalDetails: {
-            difficulty: song.difficulty,
-            needsWork: song.needsWork,
-            order: song.order,
-            timeAllocated: song.timeAllocated,
-            focusPoints: song.focusPoints,
-            notes: song.notes,
-            musicalKey: song.musicalKey,
-            // Lead singers for this rehearsal
-            leadSinger: song.leadSinger?.map(singer => ({
-              id: singer.id,
-              firstName: singer.firstName,
-              lastName: singer.lastName,
-              email: singer.email
-            })) || [],
-            // Musicians assigned for this rehearsal
-            musicians: song.musicians?.map(musician => ({
-              id: musician.id,
-              user: {
-                id: musician.user.id,
-                firstName: musician.user.firstName,
-                lastName: musician.user.lastName,
-                email: musician.user.email
-              },
-              instrument: musician.instrument,
-              notes: musician.notes,
-              practiceNotes: musician.practiceNotes,
-              needsPractice: musician.needsPractice,
-              isSoloist: musician.isSoloist,
-              isAccompanist: musician.isAccompanist,
-              soloStartTime: musician.soloStartTime,
-              soloEndTime: musician.soloEndTime,
-              soloNotes: musician.soloNotes,
-              accompanimentNotes: musician.accompanimentNotes,
-              order: musician.order,
-              timeAllocated: musician.timeAllocated
-            })) || [],
-            // Voice parts for this rehearsal
-            voiceParts: song.voiceParts?.map(voicePart => ({
-              id: voicePart.id,
-              voicePartType: voicePart.voicePartType,
-              needsWork: voicePart.needsWork,
-              focusPoints: voicePart.focusPoints,
-              notes: voicePart.notes,
-              order: voicePart.order,
-              timeAllocated: voicePart.timeAllocated,
-              // Members assigned to this voice part
-              members: voicePart.members?.map(member => ({
-                id: member.id,
-                firstName: member.firstName,
-                lastName: member.lastName,
-                email: member.email
-              })) || []
-            })) || [],
-            // Chorus members for this rehearsal
-            chorusMembers: song.chorusMembers?.map(member => ({
+        // Rehearsal-specific info (editable, rehearsal context)
+        rehearsalDetails: {
+          difficulty: song.difficulty,
+          needsWork: song.needsWork,
+          order: song.order,
+          timeAllocated: song.timeAllocated,
+          focusPoints: song.focusPoints,
+          notes: song.notes,
+          musicalKey: song.musicalKey,
+          // Lead singers for this rehearsal
+          leadSinger: song.leadSinger?.map(singer => ({
+            id: singer.id,
+            firstName: singer.firstName,
+            lastName: singer.lastName,
+            email: singer.email
+          })) || [],
+          // Musicians assigned for this rehearsal
+          musicians: song.musicians?.map(musician => ({
+            id: musician.id,
+            user: {
+              id: musician.user.id,
+              firstName: musician.user.firstName,
+              lastName: musician.user.lastName,
+              email: musician.user.email
+            },
+            instrument: musician.instrument,
+            notes: musician.notes,
+            practiceNotes: musician.practiceNotes,
+            needsPractice: musician.needsPractice,
+            isSoloist: musician.isSoloist,
+            isAccompanist: musician.isAccompanist,
+            soloStartTime: musician.soloStartTime,
+            soloEndTime: musician.soloEndTime,
+            soloNotes: musician.soloNotes,
+            accompanimentNotes: musician.accompanimentNotes,
+            order: musician.order,
+            timeAllocated: musician.timeAllocated
+          })) || [],
+          // Voice parts for this rehearsal
+          voiceParts: song.voiceParts?.map(voicePart => ({
+            id: voicePart.id,
+            voicePartType: voicePart.voicePartType,
+            needsWork: voicePart.needsWork,
+            focusPoints: voicePart.focusPoints,
+            notes: voicePart.notes,
+            order: voicePart.order,
+            timeAllocated: voicePart.timeAllocated,
+            // Members assigned to this voice part
+            members: voicePart.members?.map(member => ({
               id: member.id,
               firstName: member.firstName,
               lastName: member.lastName,
               email: member.email
             })) || []
-          }
-        })) || []
-      };
-      
-      return result;
-    } catch (error) {
-      throw error;
-    }
+          })) || [],
+          // Chorus members for this rehearsal
+          chorusMembers: song.chorusMembers?.map(member => ({
+            id: member.id,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            email: member.email
+          })) || []
+        }
+      })) || []
+    };
+    
+    return result;
   }
 
   /**
@@ -638,104 +597,99 @@ export class RehearsalService {
     rehearsalInfo: any;
     debug: any;
   }> {
+    const rehearsal = await this.findOne(rehearsalId);
+    const reasons: string[] = [];
     
-    try {
-      const rehearsal = await this.findOne(rehearsalId);
-      const reasons: string[] = [];
-      
-      // Check if rehearsal has performanceId
-      if (!rehearsal.performanceId) {
-        reasons.push('Performance ID is required but missing');
-        return {
-          canPromote: false,
-          reasons,
-          rehearsalInfo: {
-            id: rehearsal.id,
-            title: rehearsal.title,
-            performanceId: rehearsal.performanceId
-          },
-          debug: {
-            rehearsalPerformanceId: rehearsal.performanceId,
-            performanceExists: false,
-            performanceStatus: 'NOT_FOUND',
-            requiredStatus: 'in_preparation'
-          }
-        };
-      }
-      
-      // Get performance info
-      let performanceInfo = null;
-      try {
-        performanceInfo = await this.performanceRepository.findOne({
-          where: { id: rehearsal.performanceId },
-          select: ['id', 'status', 'date', 'location', 'type']
-        });
-      } catch (error) {
-        reasons.push('Unable to fetch performance information');
-      }
-      
-      if (!performanceInfo) {
-        reasons.push(`Performance with ID ${rehearsal.performanceId} not found`);
-        return {
-          canPromote: false,
-          reasons,
-          rehearsalInfo: {
-            id: rehearsal.id,
-            title: rehearsal.title,
-            performanceId: rehearsal.performanceId
-          },
-          debug: {
-            rehearsalPerformanceId: rehearsal.performanceId,
-            performanceExists: false,
-            performanceStatus: 'NOT_FOUND',
-            requiredStatus: 'in_preparation'
-          }
-        };
-      }
-      
-      // Check performance status
-      if (performanceInfo.status !== 'in_preparation') {
-        reasons.push(`Performance must be in 'in_preparation' status. Current status: ${performanceInfo.status}`);
-      }
-      
-      // Check if rehearsal has songs
-      if (!rehearsal.rehearsalSongs || rehearsal.rehearsalSongs.length === 0) {
-        reasons.push('Rehearsal must contain at least one song');
-      }
-      
-      // Check if songs have voice parts (recommended but not required)
-      const songsWithVoiceParts = rehearsal.rehearsalSongs?.filter(song => 
-        song.voiceParts && song.voiceParts.length > 0
-      ) || [];
-      
-      if (songsWithVoiceParts.length === 0) {
-        reasons.push('No songs have voice parts assigned (recommended for better performance preparation)');
-      }
-      
-      const canPromote = reasons.length === 0;
-      
+    // Check if rehearsal has performanceId
+    if (!rehearsal.performanceId) {
+      reasons.push('Performance ID is required but missing');
       return {
-        canPromote,
+        canPromote: false,
         reasons,
-        performanceInfo,
         rehearsalInfo: {
           id: rehearsal.id,
           title: rehearsal.title,
-          performanceId: rehearsal.performanceId,
-          songsCount: rehearsal.rehearsalSongs?.length || 0,
-          songsWithVoiceParts: songsWithVoiceParts.length
+          performanceId: rehearsal.performanceId
         },
-        // Additional debug info for frontend
         debug: {
           rehearsalPerformanceId: rehearsal.performanceId,
-          performanceExists: !!performanceInfo,
-          performanceStatus: performanceInfo?.status || 'NOT_FOUND',
+          performanceExists: false,
+          performanceStatus: 'NOT_FOUND',
           requiredStatus: 'in_preparation'
         }
       };
-    } catch (error) {
-      throw error;
     }
+    
+    // Get performance info
+    let performanceInfo = null;
+    try {
+      performanceInfo = await this.performanceRepository.findOne({
+        where: { id: rehearsal.performanceId },
+        select: ['id', 'status', 'date', 'location', 'type']
+      });
+    } catch (error) {
+      reasons.push('Unable to fetch performance information');
+    }
+    
+    if (!performanceInfo) {
+      reasons.push(`Performance with ID ${rehearsal.performanceId} not found`);
+      return {
+        canPromote: false,
+        reasons,
+        rehearsalInfo: {
+          id: rehearsal.id,
+          title: rehearsal.title,
+          performanceId: rehearsal.performanceId
+        },
+        debug: {
+          rehearsalPerformanceId: rehearsal.performanceId,
+          performanceExists: false,
+          performanceStatus: 'NOT_FOUND',
+          requiredStatus: 'in_preparation'
+        }
+      };
+    }
+    
+    // Check performance status
+    if (performanceInfo.status !== 'in_preparation') {
+      reasons.push(`Performance must be in 'in_preparation' status. Current status: ${performanceInfo.status}`);
+    }
+    
+    // Check if rehearsal has songs
+    if (!rehearsal.rehearsalSongs || rehearsal.rehearsalSongs.length === 0) {
+      reasons.push('Rehearsal must contain at least one song');
+    }
+    
+    // Check if songs have voice parts (recommended but not required)
+    const songsWithVoiceParts = rehearsal.rehearsalSongs?.filter(song => 
+      song.voiceParts && song.voiceParts.length > 0
+    ) || [];
+    
+    if (songsWithVoiceParts.length === 0) {
+      reasons.push('No songs have voice parts assigned (recommended for better performance preparation)');
+    }
+    
+    const canPromote = reasons.length === 0;
+    
+    return {
+      canPromote,
+      reasons,
+      performanceInfo,
+      rehearsalInfo: {
+        id: rehearsal.id,
+        title: rehearsal.title,
+        performanceId: rehearsal.performanceId,
+        songsCount: rehearsal.rehearsalSongs?.length || 0,
+        songsWithVoiceParts: songsWithVoiceParts.length
+      },
+      // Additional debug info for frontend
+      debug: {
+        rehearsalPerformanceId: rehearsal.performanceId,
+        performanceExists: !!performanceInfo,
+        performanceStatus: performanceInfo?.status || 'NOT_FOUND',
+        requiredStatus: 'in_preparation'
+      }
+    };
   }
 
   /**
@@ -821,6 +775,8 @@ export class RehearsalService {
           const musician = this.rehearsalSongMusicianRepository.create({
             rehearsalSong: { id: savedRehearsalSong.id } as RehearsalSong,
             user: { id: musicianDto.userId } as User,
+            musicianName: musicianDto.musicianName,
+            role: musicianDto.role,
             instrument: musicianDto.instrument,
             notes: musicianDto.notes,
             practiceNotes: musicianDto.practiceNotes,
@@ -1034,6 +990,8 @@ export class RehearsalService {
           this.rehearsalSongMusicianRepository.create({
             rehearsalSong: { id: savedRehearsalSong.id } as RehearsalSong,
             user: { id: musician.user.id } as User,
+            musicianName: musician.musicianName,
+            role: musician.role,
             instrument: musician.instrument,
             notes: musician.notes,
             practiceNotes: musician.practiceNotes,
@@ -1138,50 +1096,82 @@ export class RehearsalService {
       musicalKey: updateData.musicalKey,
     });
 
+    // Update lead singers if provided
+    if (updateData.leadSingerIds !== undefined) {
+      const leadSingers = updateData.leadSingerIds.length > 0 
+        ? await this.userRepository.findBy({ id: In(updateData.leadSingerIds) })
+        : [];
+      rehearsalSong.leadSinger = leadSingers;
+      await this.rehearsalSongRepository.save(rehearsalSong);
+    }
+
+    // Update chorus members if provided
+    if (updateData.chorusMemberIds !== undefined) {
+      const chorusMembers = updateData.chorusMemberIds.length > 0
+        ? await this.userRepository.findBy({ id: In(updateData.chorusMemberIds) })
+        : [];
+      rehearsalSong.chorusMembers = chorusMembers;
+      await this.rehearsalSongRepository.save(rehearsalSong);
+    }
+
     // Update musicians if provided
-    if (updateData.musicians && updateData.musicians.length > 0) {
+    if (updateData.musicians !== undefined) {
       // Remove existing musicians
       await this.rehearsalSongMusicianRepository.delete({ rehearsalSong: { id: songId } });
 
-      // Add new musicians
-      for (const musicianData of updateData.musicians) {
-        const musician = this.rehearsalSongMusicianRepository.create({
-          rehearsalSong: { id: songId },
-          user: musicianData.userId ? { id: musicianData.userId } : undefined,
-          instrument: musicianData.instrument,
-          notes: musicianData.notes,
-          practiceNotes: musicianData.practiceNotes,
-          needsPractice: musicianData.needsPractice,
-          isSoloist: musicianData.isSoloist,
-          isAccompanist: musicianData.isAccompanist,
-          soloStartTime: musicianData.soloStartTime,
-          soloEndTime: musicianData.soloEndTime,
-          soloNotes: musicianData.soloNotes,
-          accompanimentNotes: musicianData.accompanimentNotes,
-          order: musicianData.order,
-          timeAllocated: musicianData.timeAllocated,
-        });
-        await this.rehearsalSongMusicianRepository.save(musician);
+      // Add new musicians (if any)
+      if (updateData.musicians.length > 0) {
+        for (const musicianData of updateData.musicians) {
+          const musician = this.rehearsalSongMusicianRepository.create({
+            rehearsalSong: { id: songId },
+            user: musicianData.userId ? { id: musicianData.userId } : undefined,
+            musicianName: musicianData.musicianName,
+            role: musicianData.role,
+            instrument: musicianData.instrument,
+            notes: musicianData.notes,
+            practiceNotes: musicianData.practiceNotes,
+            needsPractice: musicianData.needsPractice,
+            isSoloist: musicianData.isSoloist,
+            isAccompanist: musicianData.isAccompanist,
+            soloStartTime: musicianData.soloStartTime,
+            soloEndTime: musicianData.soloEndTime,
+            soloNotes: musicianData.soloNotes,
+            accompanimentNotes: musicianData.accompanimentNotes,
+            order: musicianData.order,
+            timeAllocated: musicianData.timeAllocated,
+          });
+          await this.rehearsalSongMusicianRepository.save(musician);
+        }
       }
     }
 
     // Update voice parts if provided
-    if (updateData.voiceParts && updateData.voiceParts.length > 0) {
+    if (updateData.voiceParts !== undefined) {
       // Remove existing voice parts
       await this.rehearsalVoicePartRepository.delete({ rehearsalSong: { id: songId } });
 
-      // Add new voice parts
-      for (const voicePartData of updateData.voiceParts) {
-        const voicePart = this.rehearsalVoicePartRepository.create({
-          rehearsalSong: { id: songId },
-          voicePartType: voicePartData.voicePartType,
-          needsWork: voicePartData.needsWork,
-          focusPoints: voicePartData.focusPoints,
-          notes: voicePartData.notes,
-          order: voicePartData.order,
-          timeAllocated: voicePartData.timeAllocated,
-        });
-        await this.rehearsalVoicePartRepository.save(voicePart);
+      // Add new voice parts (if any)
+      if (updateData.voiceParts.length > 0) {
+        for (const voicePartData of updateData.voiceParts) {
+          const voicePart = this.rehearsalVoicePartRepository.create({
+            rehearsalSong: { id: songId },
+            voicePartType: voicePartData.voicePartType,
+            needsWork: voicePartData.needsWork,
+            focusPoints: voicePartData.focusPoints,
+            notes: voicePartData.notes,
+            order: voicePartData.order,
+            timeAllocated: voicePartData.timeAllocated,
+          });
+
+          const savedVoicePart = await this.rehearsalVoicePartRepository.save(voicePart);
+
+          // Handle voice part members
+          if (voicePartData.memberIds && voicePartData.memberIds.length > 0) {
+            const members = await this.userRepository.findBy({ id: In(voicePartData.memberIds) });
+            savedVoicePart.members = members;
+            await this.rehearsalVoicePartRepository.save(savedVoicePart);
+          }
+        }
       }
     }
 
