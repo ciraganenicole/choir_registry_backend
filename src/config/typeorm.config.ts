@@ -1,8 +1,5 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
-import { AdminUser } from '../modules/admin/admin_users.entity';
-import { User } from '../modules/users/user.entity';
-import { Attendance } from '../modules/attendance/attendance.entity';
 import path from 'path';
 
 config();
@@ -17,10 +14,8 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
-  entities: isProduction
-    ? [path.join(__dirname, '../modules/**/*.entity.js')]
-    : [User, AdminUser, Attendance],
+  entities: [path.join(__dirname, '../modules/**/*.entity.js')],
   migrations: [path.join(__dirname, '../database/migrations/*.js')],
   synchronize: false, // Don't use `true` in production!
-  logging: true,
+  logging: isProduction ? false : ['error', 'warn'],
 });

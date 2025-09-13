@@ -27,8 +27,6 @@ export const adminSeeder = async (dataSource: DataSource) => {
     },
   ];
 
-  console.log('Starting to seed admin users...');
-
   for (const adminData of admins) {
     try {
       const existingAdmin = await adminRepository.findOne({
@@ -36,7 +34,6 @@ export const adminSeeder = async (dataSource: DataSource) => {
       });
 
       if (!existingAdmin) {
-        console.log(`Creating admin: ${adminData.email}`);
         const hashedPassword = await bcrypt.hash(adminData.password, 10);
         const admin = adminRepository.create({
           ...adminData,
@@ -44,7 +41,6 @@ export const adminSeeder = async (dataSource: DataSource) => {
           isActive: true,
         });
         await adminRepository.save(admin);
-        console.log(`Created admin: ${adminData.email}`);
       } else {
         console.log(`Admin already exists: ${adminData.email}`);
       }
@@ -52,6 +48,4 @@ export const adminSeeder = async (dataSource: DataSource) => {
       console.error(`Error creating admin ${adminData.email}:`, error);
     }
   }
-
-  console.log('Admin seeding completed');
 }; 

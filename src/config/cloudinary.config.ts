@@ -21,7 +21,6 @@ export const uploadToCloudinary = async (file: Express.Multer.File): Promise<str
     });
     return result.secure_url;
   } catch (error) {
-    console.error('Cloudinary upload error:', error);
     throw new Error('Failed to upload image to Cloudinary');
   }
 }; 

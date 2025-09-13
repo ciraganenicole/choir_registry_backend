@@ -90,8 +90,20 @@ export class User {
         default: '{}',
         nullable: true,
         transformer: {
-            to: (value: Commission[]): string[] => value ? value.map(v => v.toString()) : [],
-            from: (value: string[]): Commission[] => value ? value.map(v => v as Commission) : []
+            to: (value: Commission[]): string[] => {
+                if (!value) return [];
+                if (Array.isArray(value)) {
+                    return value.map(v => v.toString());
+                }
+                return [];
+            },
+            from: (value: string[]): Commission[] => {
+                if (!value) return [];
+                if (Array.isArray(value)) {
+                    return value.map(v => v as Commission);
+                }
+                return [];
+            }
         }
     })
     commissions: Commission[];
@@ -105,8 +117,20 @@ export class User {
         default: '{NORMAL}',
         nullable: true,
         transformer: {
-            to: (value: UserCategory[]): string[] => value ? value.map(v => v.toString()) : [UserCategory.NORMAL],
-            from: (value: string[]): UserCategory[] => value ? value.map(v => v as UserCategory) : [UserCategory.NORMAL]
+            to: (value: UserCategory[]): string[] => {
+                if (!value) return [UserCategory.NORMAL];
+                if (Array.isArray(value)) {
+                    return value.map(v => v.toString());
+                }
+                return [UserCategory.NORMAL];
+            },
+            from: (value: string[]): UserCategory[] => {
+                if (!value) return [UserCategory.NORMAL];
+                if (Array.isArray(value)) {
+                    return value.map(v => v as UserCategory);
+                }
+                return [UserCategory.NORMAL];
+            }
         }
     })
     categories: UserCategory[];
@@ -125,6 +149,9 @@ export class User {
 
     @Column({ nullable: true })
     profileImageUrl: string; // Cloudinary public ID
+
+    @Column({ nullable: true })
+    password: string; // For regular user authentication
 
     @CreateDateColumn()
     createdAt: Date;

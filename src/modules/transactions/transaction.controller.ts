@@ -40,28 +40,22 @@ export class TransactionController {
   @Get()
   @Roles(AdminRole.FINANCE_ADMIN, AdminRole.SUPER_ADMIN)
   async findAll(@Query() filterDto: TransactionFilterDto) {
-    try {
-      const result = await this.transactionService.findAll(filterDto);
-      return result;
-    } catch (error) {
-      console.error('Error in findAll:', error);
-      throw error;
-    }
+    return this.transactionService.findAll(filterDto);
   }
 
   @Get('stats')
   @Roles(AdminRole.FINANCE_ADMIN, AdminRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Get transaction statistics with optional date filtering' })
+  @ApiOperation({ summary: 'Get transaction statistics. When no dates provided, returns all transactions in the database.' })
   @ApiQuery({ 
       name: 'startDate', 
       required: false, 
-      description: 'Start date for filtering (YYYY-MM-DD)',
+      description: 'Start date for filtering (YYYY-MM-DD). If not provided, includes all transactions from the beginning.',
       type: String 
   })
   @ApiQuery({ 
       name: 'endDate', 
       required: false, 
-      description: 'End date for filtering (YYYY-MM-DD)',
+      description: 'End date for filtering (YYYY-MM-DD). If not provided, includes all transactions until the end.',
       type: String 
   })
   async getStats(

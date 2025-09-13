@@ -8,7 +8,7 @@
   "scripts": {
     "build": "nest build",
     "start": "node dist/main",
-    "start:dev": "nest start --watch -H 192.168.1.69",
+    "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "seed:admin": "ts-node src/database/seeds/runSeed.ts",

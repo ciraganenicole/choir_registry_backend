@@ -4,6 +4,16 @@ import { AdminUser } from './modules/admin/admin_users.entity';
 import { Attendance } from './modules/attendance/attendance.entity';
 import { User } from './modules/users/user.entity';
 import { Transaction } from './modules/transactions/transaction.entity';
+import { Song } from './modules/song/song.entity';
+import { LeadershipShift } from './modules/leadership-shift/leadership-shift.entity';
+import { Performance } from './modules/performance/performance.entity';
+import { PerformanceSong } from './modules/performance/performance-song.entity';
+import { PerformanceSongMusician } from './modules/performance/performance-song-musician.entity';
+import { PerformanceVoicePart } from './modules/performance/performance-voice-part.entity';
+import { Rehearsal } from './modules/rehearsal/rehearsal.entity';
+import { RehearsalSong } from './modules/rehearsal/rehearsal-song.entity';
+import { RehearsalSongMusician } from './modules/rehearsal/rehearsal-song-musician.entity';
+import { RehearsalVoicePart } from './modules/rehearsal/rehearsal-voice-part.entity';
 
 config();
 
@@ -16,7 +26,6 @@ const getConnectionUrl = () => {
   
   // Use sslmode=disable for local development
   const url = `postgresql://${username}:${password}@${host}:${port}/${database}?sslmode=disable`;
-  console.log('Attempting to connect to database with host:', host);
   return url;
 };
 
@@ -25,7 +34,22 @@ export const AppDataSource = new DataSource({
   url: getConnectionUrl(),
   synchronize: false,
   logging: true,
-  entities: [User, AdminUser, Attendance, Transaction],
+  entities: [
+    User, 
+    AdminUser, 
+    Attendance, 
+    Transaction, 
+    Song, 
+    LeadershipShift, 
+    Performance, 
+    PerformanceSong, 
+    PerformanceSongMusician, 
+    PerformanceVoicePart,
+    Rehearsal,
+    RehearsalSong,
+    RehearsalSongMusician,
+    RehearsalVoicePart
+  ],
   migrations: ['src/database/migrations/*.ts'],
   subscribers: [],
   ssl: {
