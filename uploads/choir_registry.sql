@@ -4229,7 +4229,7 @@ COPY public.users (id, "firstName", "lastName", gender, "maritalStatus", "educat
 52	Mupango	Innoncent	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	{}	NJC-52-2025	{NORMAL}	\N	\N	2024-12-31	t	\N	2025-04-18 08:07:17.024762	2025-04-18 08:07:17.027846
 53	Kapinga	Isabelle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	{}	NJC-53-2025	{NORMAL}	\N	\N	2024-12-31	t	\N	2025-04-18 08:07:17.028503	2025-04-18 08:07:17.031675
 54	Kitsa	Jadakim	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	{}	NJC-54-2025	{NORMAL}	\N	\N	2024-12-31	t	\N	2025-04-18 08:07:17.032377	2025-04-18 08:07:17.035252
-55	Beng'hantundu	Jaelle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	{}	NJC-55-2025	{NORMAL}	\N	\N	2024-12-31	t	\N	2025-04-18 08:07:17.035802	2025-04-18 08:07:17.039298
+55	Benghantundu	Jaelle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	{}	NJC-55-2025	{NORMAL}	\N	\N	2024-12-31	t	\N	2025-04-18 08:07:17.035802	2025-04-18 08:07:17.039298
 56	Bwalitse	Jean	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	{}	NJC-56-2025	{NORMAL}	\N	\N	2024-12-31	t	\N	2025-04-18 08:07:17.040244	2025-04-18 08:07:17.044024
 57	Safari	Jeanne	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	{}	NJC-57-2025	{NORMAL}	\N	\N	2024-12-31	t	\N	2025-04-18 08:07:17.044707	2025-04-18 08:07:17.048198
 58	Ifodji	Joelle	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	{}	NJC-58-2025	{NORMAL}	\N	\N	2024-12-31	t	\N	2025-04-18 08:07:17.049171	2025-04-18 08:07:17.052643

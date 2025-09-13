@@ -10,16 +10,14 @@ async function bootstrap() {
     logger: ['error', 'warn', 'debug', 'log', 'verbose'],
   });
 
-  // Set global prefix for API routes (commented out to maintain frontend compatibility)
-  // app.setGlobalPrefix('api');
-
   // Enable CORS for frontend
   app.enableCors({
-    origin: ['http://localhost:3000', 'https://njc-five.vercel.app'],
-    methods: 'GET, POST, PUT, PATCH, DELETE',
+    origin: ['http://192.168.1.69:3000', 'https://njc-five.vercel.app'],
+    methods: ['GET', 'POST', 'PUT','PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: 'Content-Type, Authorization',
     credentials: true,
   });
+  
 
   // Enable global validation pipes with detailed error messages
   app.useGlobalPipes(
@@ -28,6 +26,7 @@ async function bootstrap() {
       whitelist: true,
       enableDebugMessages: true,
       exceptionFactory: (errors) => {
+        console.log('Validation errors:', JSON.stringify(errors, null, 2));
         return new BadRequestException({
           message: 'Validation failed',
           errors: errors.map(error => ({
