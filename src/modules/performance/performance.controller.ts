@@ -102,19 +102,45 @@ export class PerformanceController {
     return this.performanceService.remove(id, user.id, user.type, user.role);
   }
 
-  @Post(':id/promote-rehearsal/:rehearsalId')
+  @Post('promote-rehearsals')
   @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
-  @ApiOperation({ summary: 'Promote a rehearsal to populate performance with detailed data' })
+  @ApiOperation({ summary: 'Promote multiple completed rehearsals to populate their linked performances with detailed data' })
+  @ApiResponse({ status: 200, description: 'Rehearsals promoted successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - no rehearsal IDs provided or rehearsals not completed' })
+  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions or not on active shift' })
+  async promoteRehearsals(
+    @Body() body: { rehearsalIds: number[] },
+    @CurrentUser() user: any
+  ): Promise<{ success: number; errors: Array<{ rehearsalId: number; error: string }> }> {
+    return this.performanceService.promoteRehearsals(body.rehearsalIds, user.id, user.type, user.role);
+  }
+
+  @Post('promote-rehearsal/:rehearsalId')
+  @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
+  @ApiOperation({ summary: 'Promote a single completed rehearsal to populate its linked performance with detailed data (adds songs, skips duplicates)' })
   @ApiResponse({ status: 200, description: 'Rehearsal promoted successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request - performance not in preparation status' })
+  @ApiResponse({ status: 400, description: 'Bad request - rehearsal not completed, performance not in preparation status, or rehearsal not linked to performance' })
   @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions or not on active shift' })
   @ApiResponse({ status: 404, description: 'Performance or rehearsal not found' })
   async promoteRehearsal(
-    @Param('id', ParseIntPipe) performanceId: number,
     @Param('rehearsalId', ParseIntPipe) rehearsalId: number,
     @CurrentUser() user: any
   ): Promise<Performance> {
-    return this.performanceService.promoteRehearsal(performanceId, rehearsalId, user.id, user.type, user.role);
+    return this.performanceService.promoteRehearsal(rehearsalId, user.id, user.type, user.role);
+  }
+
+  @Post('replace-rehearsal/:rehearsalId')
+  @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
+  @ApiOperation({ summary: 'Replace all performance songs with completed rehearsal songs (clears existing and adds new)' })
+  @ApiResponse({ status: 200, description: 'Performance songs replaced successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - rehearsal not completed, performance not in preparation status, or rehearsal not linked to performance' })
+  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions or not on active shift' })
+  @ApiResponse({ status: 404, description: 'Performance or rehearsal not found' })
+  async replaceRehearsal(
+    @Param('rehearsalId', ParseIntPipe) rehearsalId: number,
+    @CurrentUser() user: any
+  ): Promise<Performance> {
+    return this.performanceService.replaceRehearsal(rehearsalId, user.id, user.type, user.role);
   }
 
   @Post(':id/mark-in-preparation')
@@ -151,6 +177,14 @@ export class PerformanceController {
   @ApiResponse({ status: 200, description: 'List of performance types' })
   async getPerformanceTypes() {
     return Object.values(PerformanceType);
+  }
+
+  @Get('promotable-rehearsals')
+  @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
+  @ApiOperation({ summary: 'Get rehearsals that can be promoted to their linked performances' })
+  @ApiResponse({ status: 200, description: 'List of promotable rehearsals' })
+  async getPromotableRehearsals() {
+    return this.performanceService.getPromotableRehearsals();
   }
 
   @Get('instruments')

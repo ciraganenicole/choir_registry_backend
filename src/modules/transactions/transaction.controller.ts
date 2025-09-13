@@ -40,12 +40,7 @@ export class TransactionController {
   @Get()
   @Roles(AdminRole.FINANCE_ADMIN, AdminRole.SUPER_ADMIN)
   async findAll(@Query() filterDto: TransactionFilterDto) {
-    try {
-      const result = await this.transactionService.findAll(filterDto);
-      return result;
-    } catch (error) {
-      throw error;
-    }
+    return this.transactionService.findAll(filterDto);
   }
 
   @Get('stats')
