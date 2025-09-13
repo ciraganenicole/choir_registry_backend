@@ -164,63 +164,75 @@ export class RecreateSongsTables1754399251057 implements MigrationInterface {
             )
         `);
 
-        // Create performance_songs table
-        await queryRunner.query(`
-            CREATE TABLE "performance_songs" (
-                "id" SERIAL PRIMARY KEY,
-                "performanceId" integer NOT NULL,
-                "songId" integer NOT NULL,
-                "leadSingerId" integer,
-                "order" integer NOT NULL DEFAULT 1,
-                "timeAllocated" integer,
-                "focusPoints" text,
-                "notes" text,
-                "musicalKey" "public"."musical_key_enum",
-                "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-                "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-            )
-        `);
+        // Create performance_songs table (only if it doesn't exist)
+        try {
+            await queryRunner.query(`
+                CREATE TABLE "performance_songs" (
+                    "id" SERIAL PRIMARY KEY,
+                    "performanceId" integer NOT NULL,
+                    "songId" integer NOT NULL,
+                    "leadSingerId" integer,
+                    "order" integer NOT NULL DEFAULT 1,
+                    "timeAllocated" integer,
+                    "focusPoints" text,
+                    "notes" text,
+                    "musicalKey" "public"."musical_key_enum",
+                    "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                    "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+                )
+            `);
+        } catch (error) {
+            console.warn('performance_songs table already exists, skipping creation');
+        }
 
-        // Create performance_song_musicians table
-        await queryRunner.query(`
-            CREATE TABLE "performance_song_musicians" (
-                "id" SERIAL PRIMARY KEY,
-                "performanceSongId" integer NOT NULL,
-                "userId" integer NOT NULL,
-                "musicianName" character varying(255),
-                "instrument" "public"."instrument_type_enum" NOT NULL,
-                "role" character varying(100),
-                "notes" text,
-                "practiceNotes" text,
-                "needsPractice" boolean NOT NULL DEFAULT false,
-                "isSoloist" boolean NOT NULL DEFAULT false,
-                "isAccompanist" boolean NOT NULL DEFAULT false,
-                "soloStartTime" integer,
-                "soloEndTime" integer,
-                "soloNotes" text,
-                "accompanimentNotes" text,
-                "order" integer NOT NULL DEFAULT 1,
-                "timeAllocated" integer,
-                "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-                "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-            )
-        `);
+        // Create performance_song_musicians table (only if it doesn't exist)
+        try {
+            await queryRunner.query(`
+                CREATE TABLE "performance_song_musicians" (
+                    "id" SERIAL PRIMARY KEY,
+                    "performanceSongId" integer NOT NULL,
+                    "userId" integer NOT NULL,
+                    "musicianName" character varying(255),
+                    "instrument" "public"."instrument_type_enum" NOT NULL,
+                    "role" character varying(100),
+                    "notes" text,
+                    "practiceNotes" text,
+                    "needsPractice" boolean NOT NULL DEFAULT false,
+                    "isSoloist" boolean NOT NULL DEFAULT false,
+                    "isAccompanist" boolean NOT NULL DEFAULT false,
+                    "soloStartTime" integer,
+                    "soloEndTime" integer,
+                    "soloNotes" text,
+                    "accompanimentNotes" text,
+                    "order" integer NOT NULL DEFAULT 1,
+                    "timeAllocated" integer,
+                    "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                    "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+                )
+            `);
+        } catch (error) {
+            console.warn('performance_song_musicians table already exists, skipping creation');
+        }
 
-        // Create performance_voice_parts table
-        await queryRunner.query(`
-            CREATE TABLE "performance_voice_parts" (
-                "id" SERIAL PRIMARY KEY,
-                "performanceSongId" integer NOT NULL,
-                "type" "public"."voice_part_type_enum" NOT NULL,
-                "needsWork" boolean NOT NULL DEFAULT false,
-                "focusPoints" text,
-                "notes" text,
-                "order" integer NOT NULL DEFAULT 1,
-                "timeAllocated" integer,
-                "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-                "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-            )
-        `);
+        // Create performance_voice_parts table (only if it doesn't exist)
+        try {
+            await queryRunner.query(`
+                CREATE TABLE "performance_voice_parts" (
+                    "id" SERIAL PRIMARY KEY,
+                    "performanceSongId" integer NOT NULL,
+                    "type" "public"."voice_part_type_enum" NOT NULL,
+                    "needsWork" boolean NOT NULL DEFAULT false,
+                    "focusPoints" text,
+                    "notes" text,
+                    "order" integer NOT NULL DEFAULT 1,
+                    "timeAllocated" integer,
+                    "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                    "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+                )
+            `);
+        } catch (error) {
+            console.warn('performance_voice_parts table already exists, skipping creation');
+        }
 
         // Create junction tables for many-to-many relationships
         await queryRunner.query(`
@@ -247,13 +259,17 @@ export class RecreateSongsTables1754399251057 implements MigrationInterface {
             )
         `);
 
-        await queryRunner.query(`
-            CREATE TABLE "performance_voice_part_members" (
-                "performanceVoicePartId" integer NOT NULL,
-                "userId" integer NOT NULL,
-                CONSTRAINT "PK_performance_voice_part_members" PRIMARY KEY ("performanceVoicePartId", "userId")
-            )
-        `);
+        try {
+            await queryRunner.query(`
+                CREATE TABLE "performance_voice_part_members" (
+                    "performanceVoicePartId" integer NOT NULL,
+                    "userId" integer NOT NULL,
+                    CONSTRAINT "PK_performance_voice_part_members" PRIMARY KEY ("performanceVoicePartId", "userId")
+                )
+            `);
+        } catch (error) {
+            console.warn('performance_voice_part_members table already exists, skipping creation');
+        }
 
         // Add foreign key constraints
         await queryRunner.query(`ALTER TABLE "rehearsals" ADD CONSTRAINT "FK_rehearsals_performance" FOREIGN KEY ("performanceId") REFERENCES "performances"("id") ON DELETE CASCADE`);
