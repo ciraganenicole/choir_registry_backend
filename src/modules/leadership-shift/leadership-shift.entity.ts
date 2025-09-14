@@ -30,11 +30,11 @@ export class LeadershipShift {
   @Column({ type: 'timestamp with time zone' })
   endDate: Date;
 
-  @ManyToOne(() => User, { nullable: false })
+  @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'leaderId' })
   leader: User;
 
-  @Column()
+  @Column({ nullable: true })
   leaderId: number;
 
   @Column({

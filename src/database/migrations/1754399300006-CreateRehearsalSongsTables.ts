@@ -64,14 +64,7 @@ export class CreateRehearsalSongsTables1754399300006 implements MigrationInterfa
       )
     `);
 
-    // Create junction tables for many-to-many relationships
-    await queryRunner.query(`
-      CREATE TABLE "rehearsal_choir_members" (
-        "rehearsalId" integer NOT NULL,
-        "userId" integer NOT NULL,
-        CONSTRAINT "PK_rehearsal_choir_members" PRIMARY KEY ("rehearsalId", "userId")
-      )
-    `);
+    // Note: rehearsal_choir_members table is created in a separate migration
 
     await queryRunner.query(`
       CREATE TABLE "rehearsal_song_chorus_members" (
@@ -101,11 +94,7 @@ export class CreateRehearsalSongsTables1754399300006 implements MigrationInterfa
         FOREIGN KEY ("rehearsalId") REFERENCES "rehearsals"("id") ON DELETE CASCADE
       `);
 
-      await queryRunner.query(`
-        ALTER TABLE "rehearsal_choir_members"
-        ADD CONSTRAINT "FK_rehearsal_choir_members_rehearsal"
-        FOREIGN KEY ("rehearsalId") REFERENCES "rehearsals"("id") ON DELETE CASCADE
-      `);
+      // rehearsal_choir_members foreign key constraints are handled in a separate migration
     }
 
     if (songsTableExists) {
@@ -129,11 +118,7 @@ export class CreateRehearsalSongsTables1754399300006 implements MigrationInterfa
         FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE
       `);
 
-      await queryRunner.query(`
-        ALTER TABLE "rehearsal_choir_members"
-        ADD CONSTRAINT "FK_rehearsal_choir_members_user"
-        FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE
-      `);
+      // rehearsal_choir_members foreign key constraints are handled in a separate migration
 
       await queryRunner.query(`
         ALTER TABLE "rehearsal_song_chorus_members"
@@ -205,17 +190,17 @@ export class CreateRehearsalSongsTables1754399300006 implements MigrationInterfa
     await queryRunner.query(`ALTER TABLE "rehearsal_song_musicians" DROP CONSTRAINT IF EXISTS "FK_rehearsal_song_musicians_rehearsal_song"`);
     await queryRunner.query(`ALTER TABLE "rehearsal_voice_part_members" DROP CONSTRAINT IF EXISTS "FK_rehearsal_voice_part_members_user"`);
     await queryRunner.query(`ALTER TABLE "rehearsal_song_chorus_members" DROP CONSTRAINT IF EXISTS "FK_rehearsal_song_chorus_members_user"`);
-    await queryRunner.query(`ALTER TABLE "rehearsal_choir_members" DROP CONSTRAINT IF EXISTS "FK_rehearsal_choir_members_user"`);
+    // rehearsal_choir_members constraints are handled in a separate migration
     await queryRunner.query(`ALTER TABLE "rehearsal_song_musicians" DROP CONSTRAINT IF EXISTS "FK_rehearsal_song_musicians_user"`);
     await queryRunner.query(`ALTER TABLE "rehearsal_songs" DROP CONSTRAINT IF EXISTS "FK_rehearsal_songs_lead_singer"`);
     await queryRunner.query(`ALTER TABLE "rehearsal_songs" DROP CONSTRAINT IF EXISTS "FK_rehearsal_songs_song"`);
-    await queryRunner.query(`ALTER TABLE "rehearsal_choir_members" DROP CONSTRAINT IF EXISTS "FK_rehearsal_choir_members_rehearsal"`);
+    // rehearsal_choir_members constraints are handled in a separate migration
     await queryRunner.query(`ALTER TABLE "rehearsal_songs" DROP CONSTRAINT IF EXISTS "FK_rehearsal_songs_rehearsal"`);
 
     // Drop tables
     await queryRunner.query(`DROP TABLE IF EXISTS "rehearsal_voice_part_members"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "rehearsal_song_chorus_members"`);
-    await queryRunner.query(`DROP TABLE IF EXISTS "rehearsal_choir_members"`);
+    // rehearsal_choir_members table is handled in a separate migration
     await queryRunner.query(`DROP TABLE IF EXISTS "rehearsal_voice_parts"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "rehearsal_song_musicians"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "rehearsal_songs"`);
