@@ -72,7 +72,7 @@ export class Rehearsal {
   performance: Performance;
 
   @Column({ nullable: true })
-  rehearsalLeadId: number; // Who is leading this specific rehearsal (can be different from shift lead)
+  rehearsalLeadId: number | null; // Who is leading this specific rehearsal (can be different from shift lead)
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'rehearsalLeadId' })

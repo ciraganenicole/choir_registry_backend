@@ -65,24 +65,34 @@ export class PerformanceService {
       }
     }
 
-    // CRITICAL: Validate that there's only one active shift before creating performance
-    const { isValid, activeShifts } = await this.validateSingleActiveShift();
-    if (!isValid) {
-      throw new BadRequestException(
-        `Cannot create performance. There are ${activeShifts.length} active shifts, but only one can be active at a time. ` +
-        `Please resolve the shift conflicts before creating performances.`
-      );
+    // Verify shift lead exists and is a LEAD user (only if provided)
+    if (createPerformanceDto.shiftLeadId) {
+      const shiftLead = await this.userRepository.findOneBy({ id: createPerformanceDto.shiftLeadId });
+      if (!shiftLead) {
+        throw new NotFoundException(`Shift lead with ID ${createPerformanceDto.shiftLeadId} not found`);
+      }
+
+      // Verify the assigned shift lead is actually a LEAD user
+      if (!shiftLead.categories?.includes(UserCategory.LEAD)) {
+        throw new BadRequestException(`User with ID ${createPerformanceDto.shiftLeadId} is not a LEAD user`);
+      }
     }
 
-    // Verify shift lead exists
-    const shiftLead = await this.userRepository.findOneBy({ id: createPerformanceDto.shiftLeadId });
-    if (!shiftLead) {
-      throw new NotFoundException(`Shift lead with ID ${createPerformanceDto.shiftLeadId} not found`);
+    // Allow creating performances for future dates (planning ahead)
+    const performanceDate = new Date(createPerformanceDto.date);
+    const now = new Date();
+    
+    // Optional: Add a reasonable limit for future planning (e.g., 2 years)
+    const maxFutureDate = new Date();
+    maxFutureDate.setFullYear(maxFutureDate.getFullYear() + 2);
+    
+    if (performanceDate > maxFutureDate) {
+      throw new BadRequestException('Cannot create performances more than 2 years in the future');
     }
 
     // Create performance
     const performance = this.performanceRepository.create({
-      date: new Date(createPerformanceDto.date),
+      date: performanceDate,
       location: createPerformanceDto.location,
       expectedAudience: createPerformanceDto.expectedAudience,
       type: createPerformanceDto.type,
@@ -95,7 +105,7 @@ export class PerformanceService {
   }
 
   async findAll(filterDto: PerformanceFilterDto): Promise<[Performance[], number]> {
-    const { page = 1, limit = 10, search, type, status, startDate, endDate, shiftLeadId } = filterDto;
+    const { page = 1, limit = 10, search, type, status, date, shiftLeadId } = filterDto;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.performanceRepository
@@ -118,10 +128,15 @@ export class PerformanceService {
       queryBuilder.andWhere('performance.status = :status', { status });
     }
 
-    if (startDate && endDate) {
-      queryBuilder.andWhere('performance.date BETWEEN :startDate AND :endDate', {
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+    if (date) {
+      // Filter by specific date (ignoring time)
+      const targetDate = new Date(date);
+      const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+      const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+      
+      queryBuilder.andWhere('performance.date BETWEEN :startOfDay AND :endOfDay', {
+        startOfDay,
+        endOfDay,
       });
     }
 
@@ -187,7 +202,17 @@ export class PerformanceService {
 
     // Update basic fields
     if (updatePerformanceDto.date) {
-      performance.date = new Date(updatePerformanceDto.date);
+      const performanceDate = new Date(updatePerformanceDto.date);
+      
+      // Allow updating to future dates (planning ahead)
+      const maxFutureDate = new Date();
+      maxFutureDate.setFullYear(maxFutureDate.getFullYear() + 2);
+      
+      if (performanceDate > maxFutureDate) {
+        throw new BadRequestException('Cannot schedule performances more than 2 years in the future');
+      }
+      
+      performance.date = performanceDate;
     }
     if (updatePerformanceDto.type) {
       performance.type = updatePerformanceDto.type;
@@ -206,12 +231,23 @@ export class PerformanceService {
     }
 
     // Update relationships if provided
-    if (updatePerformanceDto.shiftLeadId) {
-      const shiftLead = await this.userRepository.findOneBy({ id: updatePerformanceDto.shiftLeadId });
-      if (!shiftLead) {
-        throw new BadRequestException(`Shift lead with ID ${updatePerformanceDto.shiftLeadId} not found`);
+    if (updatePerformanceDto.shiftLeadId !== undefined) {
+      if (updatePerformanceDto.shiftLeadId === null || updatePerformanceDto.shiftLeadId === 0) {
+        // Allow unassigning the shift lead
+        performance.shiftLeadId = null;
+      } else {
+        const shiftLead = await this.userRepository.findOneBy({ id: updatePerformanceDto.shiftLeadId });
+        if (!shiftLead) {
+          throw new BadRequestException(`Shift lead with ID ${updatePerformanceDto.shiftLeadId} not found`);
+        }
+        
+        // Verify the assigned shift lead is actually a LEAD user
+        if (!shiftLead.categories?.includes(UserCategory.LEAD)) {
+          throw new BadRequestException(`User with ID ${updatePerformanceDto.shiftLeadId} is not a LEAD user`);
+        }
+        
+        performance.shiftLeadId = updatePerformanceDto.shiftLeadId;
       }
-      performance.shiftLeadId = updatePerformanceDto.shiftLeadId;
     }
 
     // Save the updated performance
@@ -252,6 +288,51 @@ export class PerformanceService {
       ],
       order: { date: 'DESC' },
     });
+  }
+
+  async findUnassigned(filterDto: PerformanceFilterDto): Promise<[Performance[], number]> {
+    const { page = 1, limit = 10, search, type, status, date } = filterDto;
+    const skip = (page - 1) * limit;
+
+    const queryBuilder = this.performanceRepository
+      .createQueryBuilder('performance')
+      .leftJoinAndSelect('performance.shiftLead', 'shiftLead')
+      .where('performance.shiftLeadId IS NULL');
+
+    // Apply filters
+    if (search) {
+      queryBuilder.andWhere(
+        '(LOWER(performance.location) LIKE LOWER(:search) OR LOWER(performance.notes) LIKE LOWER(:search))',
+        { search: `%${search}%` }
+      );
+    }
+
+    if (type) {
+      queryBuilder.andWhere('performance.type = :type', { type });
+    }
+
+    if (status) {
+      queryBuilder.andWhere('performance.status = :status', { status });
+    }
+
+    if (date) {
+      // Filter by specific date (ignoring time)
+      const targetDate = new Date(date);
+      const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+      const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+      
+      queryBuilder.andWhere('performance.date BETWEEN :startOfDay AND :endOfDay', {
+        startOfDay,
+        endOfDay,
+      });
+    }
+
+    // Order by date (newest first)
+    queryBuilder.orderBy('performance.date', 'DESC');
+
+    queryBuilder.skip(skip).take(limit);
+
+    return queryBuilder.getManyAndCount();
   }
 
   async getStats(): Promise<PerformanceStats> {
@@ -742,7 +823,6 @@ export class PerformanceService {
 
       // Skip if this song already exists in the performance
       if (existingSongIds.has(rehearsalSong.song.id)) {
-        console.log(`Skipping duplicate song: ${rehearsalSong.song.title || rehearsalSong.song.id}`);
         continue;
       }
 
@@ -867,18 +947,4 @@ export class PerformanceService {
     return promotableRehearsals;
   }
 
-  private async validateSingleActiveShift(): Promise<{ isValid: boolean; activeShifts: LeadershipShift[] }> {
-    try {
-      const activeShifts = await this.leadershipShiftRepository.find({
-        where: { status: ShiftStatus.ACTIVE },
-      });
-
-      if (activeShifts.length > 1) {
-        return { isValid: false, activeShifts };
-      }
-      return { isValid: true, activeShifts: [] };
-    } catch (error) {
-      return { isValid: true, activeShifts: [] };
-    }
-  }
 } 

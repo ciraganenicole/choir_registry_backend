@@ -51,12 +51,12 @@ export class Performance {
   })
   type: PerformanceType;
 
-  @ManyToOne(() => User, { nullable: false })
+  @ManyToOne(() => User, { nullable: true })
   @JoinColumn({ name: 'shiftLeadId' })
   shiftLead: User;
 
-  @Column()
-  shiftLeadId: number;
+  @Column({ nullable: true })
+  shiftLeadId: number | null;
 
   @Column({ type: 'text', nullable: true })
   notes: string;

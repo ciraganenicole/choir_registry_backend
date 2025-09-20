@@ -30,11 +30,7 @@ export class PerformanceFilterDto {
 
   @IsOptional()
   @IsDateString()
-  startDate?: string;
-
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
+  date?: string;
 
   @IsOptional()
   @IsNumber()

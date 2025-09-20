@@ -32,9 +32,14 @@ export class PerformanceController {
 
   @Post()
   @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
-  @ApiOperation({ summary: 'Create a new performance with multiple songs' })
+  @ApiOperation({ 
+    summary: 'Create a new performance',
+    description: 'SUPER_ADMIN users can create performances without assigning a shift lead (for yearly planning) or assign them to any LEAD user. LEAD users can only create performances when on their active shift and must assign themselves. Future performances can be planned up to 2 years ahead.'
+  })
   @ApiResponse({ status: 201, description: 'Performance created successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid shift lead or future date limit exceeded' })
   @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions or LEAD user not on active shift' })
+  @ApiResponse({ status: 404, description: 'Not found - shift lead not found' })
   async create(
     @Body() createPerformanceDto: CreatePerformanceDto,
     @CurrentUser() user: any
@@ -66,6 +71,17 @@ export class PerformanceController {
     return this.performanceService.findByUser(user.id);
   }
 
+  @Get('unassigned')
+  @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
+  @ApiOperation({ 
+    summary: 'Get performances without assigned shift leads',
+    description: 'Returns performances that don\'t have a shift lead assigned yet. Useful for admins to see which performances need assignment.'
+  })
+  @ApiResponse({ status: 200, description: 'List of unassigned performances' })
+  async findUnassignedPerformances(@Query() filterDto: PerformanceFilterDto): Promise<[Performance[], number]> {
+    return this.performanceService.findUnassigned(filterDto);
+  }
+
   @Get(':id')
   @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
   @ApiOperation({ summary: 'Get a specific performance by ID' })
@@ -77,9 +93,13 @@ export class PerformanceController {
 
   @Patch(':id')
   @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
-  @ApiOperation({ summary: 'Update a performance' })
+  @ApiOperation({ 
+    summary: 'Update a performance',
+    description: 'SUPER_ADMIN users can update performances, assign/unassign shift leads, or reassign them to any LEAD user. LEAD users can only update performances when on their active shift. Future dates can be set up to 2 years ahead.'
+  })
   @ApiResponse({ status: 200, description: 'Performance updated successfully' })
-  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions, not on active shift, or not the creator' })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid shift lead or future date limit exceeded' })
+  @ApiResponse({ status: 403, description: 'Forbidden - insufficient permissions or not on active shift' })
   @ApiResponse({ status: 404, description: 'Performance not found' })
   async update(
     @Param('id', ParseIntPipe) id: number,

@@ -96,7 +96,7 @@ export class RehearsalService {
       ...createRehearsalDto,
       date: new Date(createRehearsalDto.date),
       // If no rehearsal lead specified, default to the performance's shift lead
-      rehearsalLeadId: createRehearsalDto.rehearsalLeadId || performance.shiftLeadId,
+      rehearsalLeadId: createRehearsalDto.rehearsalLeadId ?? performance.shiftLeadId,
       // Set the createdById to the current user
       createdById: userId,
     });
