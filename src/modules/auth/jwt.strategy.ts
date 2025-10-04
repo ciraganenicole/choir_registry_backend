@@ -25,12 +25,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             // Handle admin user
             const adminUser = await this.adminUsersService.findById(payload.sub);
             if (adminUser && adminUser.isActive) {
+                // Find the corresponding user record for the admin
+                const correspondingUser = await this.usersService.findByEmail(adminUser.email);
                 return {
-                    id: payload.sub,
+                    id: correspondingUser?.id || payload.sub, // Use user ID if exists, fallback to admin ID
                     email: payload.email,
                     role: payload.role,
                     username: payload.username,
-                    type: 'admin'
+                    type: 'admin',
+                    adminId: payload.sub // Keep original admin ID for reference
                 };
             }
         } else if (payload.type === 'user') {

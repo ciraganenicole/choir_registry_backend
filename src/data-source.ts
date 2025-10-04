@@ -14,6 +14,8 @@ import { Rehearsal } from './modules/rehearsal/rehearsal.entity';
 import { RehearsalSong } from './modules/rehearsal/rehearsal-song.entity';
 import { RehearsalSongMusician } from './modules/rehearsal/rehearsal-song-musician.entity';
 import { RehearsalVoicePart } from './modules/rehearsal/rehearsal-voice-part.entity';
+import { Communique } from './modules/communiques/communique.entity';
+import { Report } from './modules/reports/report.entity';
 
 config();
 
@@ -48,7 +50,9 @@ export const AppDataSource = new DataSource({
     Rehearsal,
     RehearsalSong,
     RehearsalSongMusician,
-    RehearsalVoicePart
+    RehearsalVoicePart,
+    Communique,
+    Report
   ],
   migrations: ['src/database/migrations/*.ts'],
   subscribers: [],

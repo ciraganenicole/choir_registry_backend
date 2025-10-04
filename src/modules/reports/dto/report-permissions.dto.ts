@@ -1,6 +1,6 @@
 import { UserCategory } from '../../users/enums/user-category.enum';
 
-export interface SongUser {
+export interface ReportUser {
   id: number;
   type: 'admin' | 'user';
   role?: string;
@@ -11,10 +11,10 @@ export interface SongUser {
   email: string;
 }
 
-export interface SongPermission {
+export interface ReportPermission {
   canCreate: boolean;
   canUpdate: boolean;
   canDelete: boolean;
   canViewAll: boolean;
   canManageOthers: boolean;
-} 
+}

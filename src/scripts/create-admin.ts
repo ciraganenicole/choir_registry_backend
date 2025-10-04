@@ -79,18 +79,22 @@ const createAdmin = async () => {
     const admins = [
       {
         email: 'superadmin@example.com',
+        username: 'superadmin',
         name: 'Super Admin',
       },
       {
         email: 'adminlouado@example.com',
+        username: 'adminlouado',
         name: 'Louado Admin',
       },
       {
         email: 'adminadmin@example.com',
+        username: 'adminadmin',
         name: 'Administration Admin',
       },
       {
         email: 'admincaisse@example.com',
+        username: 'admincaisse',
         name: 'Caisse Admin',
       },
     ];

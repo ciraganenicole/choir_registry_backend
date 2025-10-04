@@ -10,19 +10,17 @@ import {
   ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SongService } from './song.service';
 import { CreateSongDto } from './dto/create-song.dto';
 import { UpdateSongDto } from './dto/update-song.dto';
 import { SongFilterDto } from './dto/song-filter.dto';
-import { Song, SongStatus, SongDifficulty } from './song.entity';
+import { SongStatus, SongDifficulty } from './song.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AdminRole } from '../admin/admin-role.enum';
 import { UserCategory } from '../users/enums/user-category.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { UserCategories } from '../../common/decorators/user-categories.decorator';
 import { SongResponseDto } from './dto/song-response.dto';
 import { PaginatedResponseDto } from './dto/paginated-response.dto';
 
@@ -40,7 +38,7 @@ export class SongController {
 
   @Post('test-create')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(AdminRole.SUPER_ADMIN, 'LEAD')
+  @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
   async testCreate(@Body() createSongDto: CreateSongDto, @CurrentUser() user: any): Promise<any> {
     try {
       const song = await this.songService.create(createSongDto, user.id);

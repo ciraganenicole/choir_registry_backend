@@ -32,10 +32,29 @@ export class SongService {
   ) {}
 
   private async getUserInfo(userId: number | string): Promise<SongUser> {
-    // First try to find as regular user (integer ID)
+    console.log('getUserInfo called with userId:', userId);
+    
+    // First try to find as admin user (admin users have priority)
+    const adminUserId = typeof userId === 'string' ? parseInt(userId) : userId;
+    if (!isNaN(adminUserId)) {
+      const adminUser = await this.adminUserRepository.findOneBy({ id: adminUserId });
+      if (adminUser) {
+        console.log('Found admin user:', adminUser);
+        return {
+          id: adminUser.id,
+          type: 'admin',
+          role: adminUser.role,
+          username: adminUser.username,
+          email: adminUser.email,
+        };
+      }
+    }
+
+    // If not found as admin, try as regular user
     if (typeof userId === 'number') {
       const user = await this.userRepository.findOneBy({ id: userId });
       if (user) {
+        console.log('Found regular user:', user);
         return {
           id: user.id,
           type: 'user',
@@ -47,54 +66,71 @@ export class SongService {
       }
     }
 
-    // If not found or string ID, try as admin user (convert string to number if needed)
-    const adminUserId = typeof userId === 'string' ? parseInt(userId) : userId;
-    if (isNaN(adminUserId)) {
-      throw new NotFoundException(`Invalid user ID: ${userId}`);
-    }
-    
-    const adminUser = await this.adminUserRepository.findOneBy({ id: adminUserId });
-    if (adminUser) {
-      return {
-        id: adminUser.id,
-        type: 'admin',
-        username: adminUser.username,
-        email: adminUser.email,
-      };
-    }
-
     throw new NotFoundException(`User with id ${userId} not found`);
   }
 
   private getSongPermissions(user: SongUser): SongPermission {
+    // Admin users: Check by role
     if (user.type === 'admin') {
-      // Admin users have full permissions
-      return {
-        canCreate: true,
-        canUpdate: true,
-        canDelete: true,
-        canViewAll: true,
-        canManageOthers: true,
-      };
+      switch (user.role) {
+        case 'SUPER_ADMIN':
+          return {
+            canCreate: true,
+            canUpdate: true,
+            canDelete: true,
+            canViewAll: true,
+            canManageOthers: true,
+          };
+        case 'ATTENDANCE_ADMIN':
+        case 'FINANCE_ADMIN':
+          // These admin roles are blocked from library access
+          return {
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+            canViewAll: false,
+            canManageOthers: false,
+          };
+        default:
+          // Unknown admin role - no permissions
+          return {
+            canCreate: false,
+            canUpdate: false,
+            canDelete: false,
+            canViewAll: false,
+            canManageOthers: false,
+          };
+      }
     }
 
-    if (user.type === 'user' && user.categories?.includes(UserCategory.LEAD)) {
-      // Users with LEAD category can manage songs but only their own
+    // Regular users: Check by category
+    if (user.type === 'user') {
+      if (user.categories?.includes(UserCategory.LEAD)) {
+        return {
+          canCreate: true,
+          canUpdate: true,
+          canDelete: false, // Only SUPER_ADMIN can delete
+          canViewAll: true,
+          canManageOthers: true, // LEAD users can edit any song
+        };
+      }
+      
+      // All other regular users have no permissions
       return {
-        canCreate: true,
-        canUpdate: true,
-        canDelete: true,
-        canViewAll: true,
+        canCreate: false,
+        canUpdate: false,
+        canDelete: false,
+        canViewAll: false,
         canManageOthers: false,
       };
     }
 
-    // Regular users have no permissions
+    // Fallback: no permissions
     return {
       canCreate: false,
       canUpdate: false,
       canDelete: false,
-      canViewAll: true,
+      canViewAll: false,
       canManageOthers: false,
     };
   }
@@ -124,7 +160,7 @@ export class SongService {
     const permissions = this.getSongPermissions(user);
 
     if (!permissions.canCreate) {
-      throw new ForbiddenException('You do not have permission to create songs. Only users with LEAD category or admin privileges can create songs.');
+      throw new ForbiddenException('You do not have permission to create songs. Only SUPER_ADMIN role or users with LEAD category can create songs.');
     }
 
     // Check if song with same title and composer already exists
@@ -141,7 +177,7 @@ export class SongService {
 
     // Get the user entity for the relationship
     let userEntity;
-    if (user.type === 'admin') {
+    if (user.type === 'admin' && user.role === 'SUPER_ADMIN') {
       // For admin users, we need to handle this differently since they're not in the users table
       // We'll create the song without the added_by relationship for admin users
       const song = this.songRepository.create({ 
@@ -301,7 +337,7 @@ export class SongService {
     const canManage = await this.canManageSong(id, user);
 
     if (!canManage) {
-      throw new ForbiddenException('You can only update songs you added or have admin permissions');
+      throw new ForbiddenException(`You can only update songs you added or have admin permissions. User: ${JSON.stringify(user)}, Song ID: ${id}`);
     }
 
     // Check for duplicate title/composer if being updated

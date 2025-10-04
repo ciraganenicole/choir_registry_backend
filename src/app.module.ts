@@ -13,6 +13,8 @@ import { RehearsalModule } from './modules/rehearsal/rehearsal.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { TransactionModule } from './modules/transactions/transaction.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { CommuniqueModule } from './modules/communiques/communique.module';
+import { ReportModule } from './modules/reports/report.module';
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { UploadModule } from './modules/upload/upload.module';
     AttendanceModule,
     TransactionModule,
     UploadModule,
+    CommuniqueModule,
+    ReportModule,
   ],
   controllers: [AppController],
   providers: [AppService],
