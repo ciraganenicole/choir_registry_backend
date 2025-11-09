@@ -15,6 +15,7 @@ import { TransactionModule } from './modules/transactions/transaction.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { CommuniqueModule } from './modules/communiques/communique.module';
 import { ReportModule } from './modules/reports/report.module';
+import { LouadoShiftModule } from './modules/louado-shift/louado-shift.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ReportModule } from './modules/reports/report.module';
     UploadModule,
     CommuniqueModule,
     ReportModule,
+    LouadoShiftModule,
   ],
   controllers: [AppController],
   providers: [AppService],
