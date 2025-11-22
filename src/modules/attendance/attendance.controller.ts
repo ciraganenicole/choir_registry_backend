@@ -66,6 +66,14 @@ export class AttendanceController {
         return this.attendanceService.findByUser(userId, filterDto);
     }
 
+    @Get('unjustified-weekly')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN, UserCategory.LEAD)
+    @ApiOperation({ summary: 'Get list of people who were absent without justification on Wednesday and Saturday of the week' })
+    @ApiResponse({ status: 200, description: 'List of unjustified absences from Wednesday and Saturday' })
+    async getUnjustifiedWeeklyAbsences() {
+        return this.attendanceService.findUnjustifiedAbsencesFromWeek();
+    }
+
     @Get(':id')
     @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN)
     @ApiOperation({ summary: 'Get a specific attendance record' })

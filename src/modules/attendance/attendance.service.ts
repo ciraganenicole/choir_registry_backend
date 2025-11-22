@@ -95,12 +95,44 @@ export class AttendanceService {
       );
     }
 
-    if (startDate && endDate) {
+    // Date formatting helper function
+    const formatDate = (date: Date | string): string => {
+      if (date instanceof Date) {
+        return date.toISOString().split('T')[0];
+      }
+      return typeof date === 'string' ? date.split('T')[0] : date;
+    };
+
+    // Default to current month only on first load (when both dates are missing)
+    // This improves performance by avoiding loading all records
+    let finalStartDate: string;
+    let finalEndDate: string;
+
+    if (!startDate && !endDate) {
+      // First load: default to current month
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      finalStartDate = formatDate(firstDayOfMonth);
+      finalEndDate = formatDate(lastDayOfMonth);
+      
+      // Always apply date filter
       queryBuilder.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
-        startDate,
-        endDate,
+        startDate: finalStartDate,
+        endDate: finalEndDate,
+      });
+    } else if (startDate && endDate) {
+      // Both dates provided: use them
+      finalStartDate = formatDate(startDate);
+      finalEndDate = formatDate(endDate);
+      
+      queryBuilder.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
+        startDate: finalStartDate,
+        endDate: finalEndDate,
       });
     }
+    // If only one date is provided, don't apply date filter (maintain backward compatibility)
 
     if (userId) {
       queryBuilder.andWhere('attendance.userId = :userId', { userId });
@@ -559,5 +591,63 @@ export class AttendanceService {
 
     // Save all records
     return this.attendanceRepository.save(attendanceRecords);
+  }
+
+  async findUnjustifiedAbsencesFromWeek(): Promise<Attendance[]> {
+    const today = new Date();
+    const currentDay = today.getDay(); // 0 = Sunday, 3 = Wednesday, 6 = Saturday
+    
+    // Calculate days until this week's Wednesday (day 3) and Saturday (day 6)
+    const daysUntilWednesday = 3 - currentDay;
+    const daysUntilSaturday = 6 - currentDay;
+    
+    const wednesday = new Date(today);
+    wednesday.setDate(today.getDate() + daysUntilWednesday);
+    
+    const saturday = new Date(today);
+    saturday.setDate(today.getDate() + daysUntilSaturday);
+    
+    // Format dates as YYYY-MM-DD
+    const formatDate = (date: Date) => date.toISOString().split('T')[0];
+    const wednesdayStr = formatDate(wednesday);
+    const saturdayStr = formatDate(saturday);
+    
+    return this.attendanceRepository
+      .createQueryBuilder('attendance')
+      .leftJoinAndSelect('attendance.user', 'user')
+      .where('attendance.status = :status')
+      .andWhere('attendance.justification IS NULL')
+      .andWhere('attendance.eventType = :eventType')
+      .andWhere('attendance.date IN (:...dates)')
+      .andWhere(
+        `EXISTS (
+          SELECT 1 FROM attendance a1
+          WHERE a1."userId" = attendance."userId"
+          AND a1.status = :status
+          AND a1.justification IS NULL
+          AND a1."eventType" = :eventType
+          AND a1.date = :wednesday
+        )`
+      )
+      .andWhere(
+        `EXISTS (
+          SELECT 1 FROM attendance a2
+          WHERE a2."userId" = attendance."userId"
+          AND a2.status = :status
+          AND a2.justification IS NULL
+          AND a2."eventType" = :eventType
+          AND a2.date = :saturday
+        )`
+      )
+      .setParameters({
+        status: AttendanceStatus.ABSENT,
+        eventType: AttendanceEventType.REHEARSAL,
+        wednesday: wednesdayStr,
+        saturday: saturdayStr,
+        dates: [wednesdayStr, saturdayStr]
+      })
+      .orderBy('attendance.date', 'ASC')
+      .addOrderBy('user.lastName', 'ASC')
+      .getMany();
   }
 }
