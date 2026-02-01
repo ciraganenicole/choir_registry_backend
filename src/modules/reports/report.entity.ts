@@ -12,7 +12,7 @@ export class Report {
   @Column({ type: 'date' })
   meetingDate: Date;
 
-  @Column('text')
+  @Column('text', { nullable: true })
   content: string;
 
   @Column({ nullable: true })

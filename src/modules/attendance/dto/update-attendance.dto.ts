@@ -1,5 +1,4 @@
-import { IsOptional, IsNumber, IsEnum, IsDate, IsString, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsNumber, IsEnum, IsDateString, IsString, IsBoolean } from 'class-validator';
 import { AttendanceEventType, AttendanceStatus, AttendanceType, JustificationReason } from '../attendance.entity';
 import { PartialType } from '@nestjs/mapped-types';
 import { CreateAttendanceDto } from './create-attendance.dto';
@@ -18,9 +17,8 @@ export class UpdateAttendanceDto extends PartialType(CreateAttendanceDto) {
     eventType?: AttendanceEventType;
 
     @IsOptional()
-    @Type(() => Date)
-    @IsDate()
-    date?: Date | string;
+    @IsDateString()
+    date?: string;
 
     @IsOptional()
     @IsString()

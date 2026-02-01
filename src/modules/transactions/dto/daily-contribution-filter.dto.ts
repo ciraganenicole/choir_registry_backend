@@ -1,17 +1,14 @@
-import { IsDate, IsEnum, IsOptional, IsString, IsNumber } from 'class-validator';
+import { IsDateString, IsEnum, IsOptional, IsString, IsNumber } from 'class-validator';
 import { TransactionType } from '../enums/transactions-categories.enum';
-import { Type } from 'class-transformer';
 
 export class DailyContributionFilterDto {
     @IsOptional()
-    @IsDate()
-    @Type(() => Date)
-    startDate?: Date;
+    @IsDateString()
+    startDate?: string;
 
     @IsOptional()
-    @IsDate()
-    @Type(() => Date)
-    endDate?: Date;
+    @IsDateString()
+    endDate?: string;
 
     @IsOptional()
     @IsNumber()

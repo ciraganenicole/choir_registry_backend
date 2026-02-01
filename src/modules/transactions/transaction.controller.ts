@@ -62,17 +62,14 @@ export class TransactionController {
       @Query('startDate') startDate?: string,
       @Query('endDate') endDate?: string
   ) {
-      return this.transactionService.getStats(
-          startDate ? new Date(startDate) : undefined,
-          endDate ? new Date(endDate) : undefined
-      );
+      return this.transactionService.getStats(startDate, endDate);
   }
 
   @Get('stats/detailed')
   @Roles(AdminRole.FINANCE_ADMIN, AdminRole.SUPER_ADMIN)
   async getTransactionStats(
-    @Query('startDate') startDate: Date,
-    @Query('endDate') endDate: Date,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
     @Query('groupBy') groupBy: 'week' | 'month' | 'year'
   ) {
     return this.transactionService.getTransactionStats(startDate, endDate, groupBy);
@@ -94,8 +91,8 @@ export class TransactionController {
   @Roles(AdminRole.FINANCE_ADMIN, AdminRole.SUPER_ADMIN)
   async getTransactionHistory(
     @Param('userId', ParseIntPipe) userId: number,
-    @Query('startDate') startDate: Date,
-    @Query('endDate') endDate: Date
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string
   ) {
     return this.transactionService.getTransactionHistory(userId, startDate, endDate);
   }

@@ -63,10 +63,8 @@ export class AttendanceService {
   async create(createAttendanceDto: CreateAttendanceDto): Promise<Attendance> {
     const { date, eventType, ...rest } = createAttendanceDto;
 
-    // Format the date as YYYY-MM-DD string
-    const formattedDate = typeof date === 'string' 
-      ? date.split('T')[0]  // If it's already a string, just take the date part
-      : new Date(date as Date).toISOString().split('T')[0];  // If it's a Date object, convert to YYYY-MM-DD
+    // Format the date as YYYY-MM-DD string (extract date part from ISO string if needed)
+    const formattedDate = date.split('T')[0];
 
     // Create the attendance record
     const attendance = new Attendance();
@@ -95,12 +93,9 @@ export class AttendanceService {
       );
     }
 
-    // Date formatting helper function
-    const formatDate = (date: Date | string): string => {
-      if (date instanceof Date) {
-        return date.toISOString().split('T')[0];
-      }
-      return typeof date === 'string' ? date.split('T')[0] : date;
+    // Date formatting helper function - extract date part from ISO string
+    const formatDate = (dateStr: string): string => {
+      return dateStr.split('T')[0];
     };
 
     // Default to current month only on first load (when both dates are missing)
@@ -114,8 +109,8 @@ export class AttendanceService {
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       
-      finalStartDate = formatDate(firstDayOfMonth);
-      finalEndDate = formatDate(lastDayOfMonth);
+      finalStartDate = firstDayOfMonth.toISOString().split('T')[0];
+      finalEndDate = lastDayOfMonth.toISOString().split('T')[0];
       
       // Always apply date filter
       queryBuilder.andWhere('attendance.date BETWEEN :startDate AND :endDate', {
@@ -123,7 +118,7 @@ export class AttendanceService {
         endDate: finalEndDate,
       });
     } else if (startDate && endDate) {
-      // Both dates provided: use them
+      // Both dates provided: use them (extract date part from ISO strings)
       finalStartDate = formatDate(startDate);
       finalEndDate = formatDate(endDate);
       
@@ -208,9 +203,8 @@ export class AttendanceService {
     
     let formattedDate = attendance.date;
     if (date) {
-      formattedDate = typeof date === 'string'
-        ? date.split('T')[0]  // If it's already a string, just take the date part
-        : new Date(date as Date).toISOString().split('T')[0];  // If it's a Date object, convert to YYYY-MM-DD
+      // Extract date part from ISO string
+      formattedDate = date.split('T')[0];
     }
 
     if (rest.userId) {

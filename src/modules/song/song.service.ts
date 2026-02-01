@@ -376,6 +376,10 @@ export class SongService {
     await this.songRepository.delete(id);
   }
 
+  /**
+   * Manually increment the performance count for a song
+   * This is a legacy method. Consider using calculatePerformanceCount() for accurate counts.
+   */
   async incrementPerformanceCount(id: number): Promise<Song> {
     const song = await this.findOne(id);
     
@@ -385,6 +389,96 @@ export class SongService {
     });
     
     return this.findOne(id);
+  }
+
+  /**
+   * Calculate how many times a song has been performed by counting actual performance records
+   * This queries the performance_songs table to get the real count from all performances
+   * (not just completed ones, as songs should be counted once they're added to a performance)
+   * @param songId - The song ID to calculate count for
+   * @param includeAll - If true, includes all performances regardless of status (for debugging)
+   */
+  async calculatePerformanceCount(songId: number, includeAll: boolean = false): Promise<{
+    count: number;
+    totalCount: number;
+    lastPerformed: Date | null;
+    performances: Array<{ performanceId: number; date: Date; status: string; type: string; location: string | null }>;
+  }> {
+    // First, check if song exists
+    const song = await this.songRepository.findOne({ where: { id: songId } });
+    if (!song) {
+      throw new NotFoundException(`Song with id ${songId} not found`);
+    }
+
+    // Build base query - count ALL performances, not just completed ones
+    const baseQuery = this.songRepository.manager
+      .createQueryBuilder()
+      .from('performance_songs', 'ps')
+      .innerJoin('performances', 'p', 'p.id = ps.performanceId')
+      .where('ps.songId = :songId', { songId });
+
+    // Query to count all performances (all statuses)
+    const result = await baseQuery
+      .clone()
+      .select('COUNT(DISTINCT ps.performanceId)', 'count')
+      .addSelect('MAX(p.date)', 'lastPerformed')
+      .getRawOne();
+
+    // Get detailed performance information (all statuses)
+    const performances = await baseQuery
+      .clone()
+      .select('p.id', 'performanceId')
+      .addSelect('p.date', 'date')
+      .addSelect('p.status', 'status')
+      .addSelect('p.type', 'type')
+      .addSelect('p.location', 'location')
+      .orderBy('p.date', 'DESC')
+      .getRawMany();
+
+    const totalCount = parseInt(result?.count || '0', 10);
+
+    return {
+      count: totalCount, // Count all performances, not just completed
+      totalCount: totalCount,
+      lastPerformed: result?.lastPerformed ? new Date(result.lastPerformed) : null,
+      performances: performances.map(p => ({
+        performanceId: p.performanceId,
+        date: new Date(p.date),
+        status: p.status,
+        type: p.type,
+        location: p.location,
+      })),
+    };
+  }
+
+  /**
+   * Update the song's times_performed and last_performed fields based on actual performance records
+   * This syncs the stored counter with the real count from the database
+   */
+  async syncPerformanceCount(songId: number): Promise<Song> {
+    const performanceData = await this.calculatePerformanceCount(songId);
+    
+    await this.songRepository.update(songId, {
+      times_performed: performanceData.count,
+      last_performed: performanceData.lastPerformed || undefined,
+    });
+    
+    return this.findOne(songId);
+  }
+
+  /**
+   * Get a song with its actual performance count (calculated from performance records)
+   * This is more accurate than using the stored times_performed field
+   */
+  async findOneWithPerformanceCount(id: number): Promise<Song & { actualPerformanceCount: number; lastPerformedDate: Date | null }> {
+    const song = await this.findOne(id);
+    const performanceData = await this.calculatePerformanceCount(id);
+    
+    return {
+      ...song,
+      actualPerformanceCount: performanceData.count,
+      lastPerformedDate: performanceData.lastPerformed,
+    };
   }
 
   async bulkUpdateStatus(songIds: number[], status: SongStatus, userId: number): Promise<void> {

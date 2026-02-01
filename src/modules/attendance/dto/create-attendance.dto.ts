@@ -1,5 +1,4 @@
-import { IsNotEmpty, IsEnum, IsDate, IsNumber, IsOptional, IsString } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsNotEmpty, IsEnum, IsDateString, IsNumber, IsOptional, IsString } from 'class-validator';
 import { AttendanceStatus, AttendanceType, AttendanceEventType, JustificationReason } from '../attendance.entity';
 
 export class CreateAttendanceDto {
@@ -12,9 +11,8 @@ export class CreateAttendanceDto {
     eventType: AttendanceEventType;
 
     @IsNotEmpty()
-    @Type(() => Date)
-    @IsDate()
-    date: Date | string;
+    @IsDateString()
+    date: string;
 
     @IsNotEmpty()
     @IsEnum(AttendanceStatus)

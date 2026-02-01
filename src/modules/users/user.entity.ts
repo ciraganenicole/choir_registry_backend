@@ -148,7 +148,7 @@ export class User {
     isActive: boolean;
 
     @Column({ nullable: true })
-    profileImageUrl: string; // Cloudinary public ID
+    profileImageUrl: string; // URL to profile image
 
     @Column({ nullable: true })
     password: string; // For regular user authentication

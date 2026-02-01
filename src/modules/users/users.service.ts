@@ -1,5 +1,5 @@
 /* eslint-disable prettier/prettier */
-import { Injectable, NotFoundException, BadRequestException, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In, Between } from 'typeorm';
 import { User } from './user.entity';
@@ -7,72 +7,19 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserCategory } from './enums/user-category.enum';
 import { UserFilterDto } from './dto/user-filter.dto';
-import { v2 as cloudinary } from 'cloudinary';
 import { Transaction } from '../transactions/transaction.entity';
 import { Attendance } from '../attendance/attendance.entity';
-import { ConfigService } from '@nestjs/config';
 import { TransactionType } from '../transactions/enums/transactions-categories.enum';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
-export class UsersService implements OnModuleInit {
-    private cloudinaryConfigured = false;
-
+export class UsersService {
     constructor(
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
         @InjectRepository(Transaction)
-        private readonly transactionRepository: Repository<Transaction>,
-        private readonly configService: ConfigService
+        private readonly transactionRepository: Repository<Transaction>
     ) {}
-
-    onModuleInit() {
-        const cloudName = this.configService.get<string>('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME');
-        const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY');
-        const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET');
-
-        if (!cloudName || !apiKey || !apiSecret) {
-            throw new Error('Cloudinary configuration is missing');
-        }
-
-        cloudinary.config({
-            cloud_name: cloudName,
-            api_key: apiKey,
-            api_secret: apiSecret,
-        });
-
-        this.cloudinaryConfigured = true;
-    }
-
-    private async handleProfileImage(userId: number, imageUrl: string): Promise<string> {
-        try {
-            // Extract public_id from the URL
-            const match = imageUrl.match(/\/v\d+\/([^/]+)\.[^.]+$/);
-            if (!match) {
-                throw new BadRequestException('Invalid Cloudinary URL format');
-            }
-
-            const publicId = match[1];
-            if (!publicId) {
-                throw new BadRequestException('Could not extract public ID from URL');
-            }
-
-            // Generate the optimized URL
-            return cloudinary.url(publicId, {
-                secure: true,
-                transformation: [
-                    { width: 400, height: 400, crop: 'fill' },
-                    { quality: 'auto' },
-                    { fetch_format: 'auto' }
-                ]
-            });
-        } catch (error: unknown) {
-            if (error instanceof BadRequestException) {
-                throw error;
-            }
-            throw new BadRequestException('Failed to handle profile image');
-        }
-    }
 
     async getAllUsers(filterDto: UserFilterDto): Promise<[User[], number]> {
         const { 

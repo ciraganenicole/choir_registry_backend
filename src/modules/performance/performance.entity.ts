@@ -58,6 +58,13 @@ export class Performance {
   @Column({ nullable: true })
   shiftLeadId: number | null;
 
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'assistantLeadId' })
+  assistantLead: User;
+
+  @Column({ nullable: true })
+  assistantLeadId: number | null; // Helper/assistant lead (main shift lead stays as shiftLeadId)
+
   @Column({ type: 'text', nullable: true })
   notes: string;
 

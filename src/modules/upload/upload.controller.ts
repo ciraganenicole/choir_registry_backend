@@ -1,6 +1,6 @@
 import { Controller, Post, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { uploadToCloudinary } from '../../config/cloudinary.config';
+import { saveFileLocally } from '../../config/storage.config';
 import * as multer from 'multer';
 import * as fs from 'fs';
 
@@ -10,7 +10,7 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file', {
     storage: multer.diskStorage({
       destination: (req, file, cb) => {
-        const uploadDir = './uploads';
+        const uploadDir = './uploads/temp';
         // Create uploads directory if it doesn't exist
         if (!fs.existsSync(uploadDir)) {
           fs.mkdirSync(uploadDir, { recursive: true });
@@ -41,7 +41,7 @@ export class UploadController {
     }
 
     try {
-      const imageUrl = await uploadToCloudinary(file);
+      const imageUrl = await saveFileLocally(file, 'images');
 
       return { url: imageUrl };
     } catch (error: any) {
@@ -53,6 +53,50 @@ export class UploadController {
       }
       throw new BadRequestException(
         error?.message || 'Failed to upload image'
+      );
+    }
+  }
+
+  @Post('document')
+  @UseInterceptors(FileInterceptor('file', {
+    storage: multer.diskStorage({
+      destination: (req, file, cb) => {
+        const uploadDir = './uploads/temp';
+        // Create uploads directory if it doesn't exist
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+      },
+      filename: (req, file, cb) => {
+        // Clean the original filename and add timestamp
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const cleanFileName = file.originalname.replace(/\s+/g, '-').toLowerCase();
+        cb(null, `${uniqueSuffix}-${cleanFileName}`);
+      },
+    }),
+    limits: {
+      fileSize: 10 * 1024 * 1024 // 10MB
+    }
+  }))
+  async uploadDocument(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    try {
+      const documentUrl = await saveFileLocally(file, 'reports');
+
+      return { url: documentUrl };
+    } catch (error: any) {
+      // Clean up the temporary file in case of error
+      if (file.path) {
+        fs.unlink(file.path, (err) => {
+          // Silently handle file deletion errors
+        });
+      }
+      throw new BadRequestException(
+        error?.message || 'Failed to upload document'
       );
     }
   }

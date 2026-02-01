@@ -1,5 +1,5 @@
 import { IsString, IsNotEmpty, IsOptional, IsUrl, IsDate } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateReportDto {
   @IsString()
@@ -10,20 +10,20 @@ export class CreateReportDto {
   @Type(() => Date)
   meetingDate: Date;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  content: string;
+  content?: string;
 
   @IsOptional()
+  @Transform(({ value }) => value === '' ? null : value)
   @IsUrl()
   attachmentUrl?: string;
 }
 
 export class UpdateReportDto {
-  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  title?: string;
+  title: string;
 
   @IsOptional()
   @IsDate()
@@ -32,10 +32,10 @@ export class UpdateReportDto {
 
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
   content?: string;
 
   @IsOptional()
+  @Transform(({ value }) => value === '' ? null : value)
   @IsUrl()
   attachmentUrl?: string;
 }

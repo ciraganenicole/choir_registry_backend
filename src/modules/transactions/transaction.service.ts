@@ -22,10 +22,8 @@ export class TransactionService {
   async create(createTransactionDto: CreateTransactionDto): Promise<Transaction> {
     const transaction = new Transaction();
     
-    // Format the date as YYYY-MM-DD string
-    const formattedDate = typeof createTransactionDto.transactionDate === 'string' 
-      ? createTransactionDto.transactionDate.split('T')[0]  // If it's already a string, just take the date part
-      : new Date(createTransactionDto.transactionDate as Date).toISOString().split('T')[0];  // If it's a Date object, convert to YYYY-MM-DD
+    // Format the date as YYYY-MM-DD string (extract date part from ISO string)
+    const formattedDate = createTransactionDto.transactionDate.split('T')[0];
     
     // Copy basic fields
     Object.assign(transaction, {
@@ -69,12 +67,9 @@ export class TransactionService {
       .leftJoinAndSelect('transaction.contributor', 'contributor');
 
     if (startDate && endDate) {
-      const startDateStr = typeof startDate === 'string' 
-        ? startDate.split('T')[0]
-        : new Date(startDate).toISOString().split('T')[0];
-      const endDateStr = typeof endDate === 'string'
-        ? endDate.split('T')[0]
-        : new Date(endDate).toISOString().split('T')[0];
+      // Extract date part from ISO strings
+      const startDateStr = startDate.split('T')[0];
+      const endDateStr = endDate.split('T')[0];
 
       queryBuilder.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
         startDate: startDateStr,
@@ -148,12 +143,10 @@ export class TransactionService {
     const transaction = await this.findOne(id);
     const { externalContributorName, contributorId, transactionDate, ...rest } = updateTransactionDto as CreateTransactionDto;
 
-    // Format the date if provided
+    // Format the date if provided (extract date part from ISO string)
     let formattedDate = transaction.transactionDate;
     if (transactionDate) {
-      formattedDate = typeof transactionDate === 'string'
-        ? transactionDate.split('T')[0]  // If it's already a string, just take the date part
-        : new Date(transactionDate as Date).toISOString().split('T')[0];  // If it's a Date object, convert to YYYY-MM-DD
+      formattedDate = transactionDate.split('T')[0];
     }
 
     // Handle contributor updates
@@ -242,9 +235,13 @@ export class TransactionService {
       .andWhere('transaction.type = :type', { type: TransactionType.INCOME });
 
     if (filters.startDate && filters.endDate) {
+      // Extract date part from ISO strings
+      const startDateStr = filters.startDate.split('T')[0];
+      const endDateStr = filters.endDate.split('T')[0];
+      
       query.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-        startDate: filters.startDate,
-        endDate: filters.endDate
+        startDate: startDateStr,
+        endDate: endDateStr
       });
     }
 
@@ -275,22 +272,14 @@ export class TransactionService {
     };
   }
 
-  async getStats(startDate?: Date | string, endDate?: Date | string, filterDto?: TransactionFilterDto) {
+  async getStats(startDate?: string, endDate?: string, filterDto?: TransactionFilterDto) {
     // Build query without default date filtering
     const query = this.transactionRepository.createQueryBuilder('transaction');
     
     // Only apply date filtering if dates are explicitly provided
     if (startDate || endDate) {
-      const startDateStr = startDate 
-        ? (typeof startDate === 'string' 
-          ? startDate.split('T')[0]
-          : new Date(startDate).toISOString().split('T')[0])
-        : undefined;
-      const endDateStr = endDate
-        ? (typeof endDate === 'string'
-          ? endDate.split('T')[0]
-          : new Date(endDate).toISOString().split('T')[0])
-        : undefined;
+      const startDateStr = startDate ? startDate.split('T')[0] : undefined;
+      const endDateStr = endDate ? endDate.split('T')[0] : undefined;
 
       if (startDateStr) {
         query.andWhere('transaction.transactionDate >= :startDate', { startDate: startDateStr });
@@ -383,16 +372,9 @@ export class TransactionService {
     // Determine date range for response
     let dateRange;
     if (startDate || endDate) {
-      const startDateStr = startDate 
-        ? (typeof startDate === 'string' 
-          ? startDate.split('T')[0]
-          : new Date(startDate).toISOString().split('T')[0])
-        : undefined;
-      const endDateStr = endDate
-        ? (typeof endDate === 'string'
-          ? endDate.split('T')[0]
-          : new Date(endDate).toISOString().split('T')[0])
-        : undefined;
+      // Extract date part from ISO strings
+      const startDateStr = startDate ? startDate.split('T')[0] : undefined;
+      const endDateStr = endDate ? endDate.split('T')[0] : undefined;
       
       dateRange = {
         from: startDateStr ? new Date(startDateStr) : null,
@@ -463,13 +445,10 @@ export class TransactionService {
     return newDate;
   }
 
-  async getTransactionStats(startDate: Date | string, endDate: Date | string, groupBy: 'week' | 'month' | 'year' = 'month') {
-    const startDateStr = typeof startDate === 'string'
-      ? startDate.split('T')[0]
-      : new Date(startDate).toISOString().split('T')[0];
-    const endDateStr = typeof endDate === 'string'
-      ? endDate.split('T')[0]
-      : new Date(endDate).toISOString().split('T')[0];
+  async getTransactionStats(startDate: string, endDate: string, groupBy: 'week' | 'month' | 'year' = 'month') {
+    // Extract date part from ISO strings
+    const startDateStr = startDate.split('T')[0];
+    const endDateStr = endDate.split('T')[0];
 
     const periods = this.getPeriods(new Date(startDateStr), new Date(endDateStr), groupBy);
     const stats = new Map<string, {
@@ -520,13 +499,10 @@ export class TransactionService {
     return Array.from(stats.values());
   }
 
-  async getTransactionHistory(userId: number, startDate: Date | string, endDate: Date | string) {
-    const startDateStr = typeof startDate === 'string'
-      ? startDate.split('T')[0]
-      : new Date(startDate).toISOString().split('T')[0];
-    const endDateStr = typeof endDate === 'string'
-      ? endDate.split('T')[0]
-      : new Date(endDate).toISOString().split('T')[0];
+  async getTransactionHistory(userId: number, startDate: string, endDate: string) {
+    // Extract date part from ISO strings
+    const startDateStr = startDate.split('T')[0];
+    const endDateStr = endDate.split('T')[0];
 
     return this.transactionRepository
       .createQueryBuilder('transaction')
@@ -551,17 +527,13 @@ export class TransactionService {
         .andWhere('transaction.type = :type', { type: TransactionType.INCOME });
 
       if (startDate && endDate) {
-        // Ensure we have proper Date objects
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-          throw new BadRequestException('Invalid date format. Please use YYYY-MM-DD format.');
-        }
+        // Extract date part from ISO strings for comparison
+        const startDateStr = startDate.split('T')[0];
+        const endDateStr = endDate.split('T')[0];
 
-        query.andWhere('transaction.transactionDate BETWEEN :start AND :end', {
-          start,
-          end,
+        query.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+          startDate: startDateStr,
+          endDate: endDateStr,
         });
       }
 

@@ -1,16 +1,14 @@
-import { IsOptional, IsDate, IsNumber, IsString } from 'class-validator';
+import { IsOptional, IsDateString, IsNumber, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class DailyContributionFilterDto {
   @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  startDate?: Date;
+  @IsDateString()
+  startDate?: string;
 
   @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  endDate?: Date;
+  @IsDateString()
+  endDate?: string;
 
   @IsOptional()
   @Type(() => Number)

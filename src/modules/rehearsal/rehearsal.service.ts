@@ -135,10 +135,14 @@ export class RehearsalService {
 
         const savedRehearsalSong = await this.rehearsalSongRepository.save(rehearsalSong);
 
-        // Handle lead singers for this song
+        // Handle lead singers for this song (optional)
         if (songDto.leadSingerIds && songDto.leadSingerIds.length > 0) {
           const leadSingers = await this.userRepository.findBy({ id: In(songDto.leadSingerIds) });
           savedRehearsalSong.leadSinger = leadSingers;
+          await this.rehearsalSongRepository.save(savedRehearsalSong);
+        } else {
+          // Explicitly set to empty array if not provided
+          savedRehearsalSong.leadSinger = [];
           await this.rehearsalSongRepository.save(savedRehearsalSong);
         }
 
@@ -154,7 +158,7 @@ export class RehearsalService {
           for (const musicianDto of songDto.musicians) {
             const musician = this.rehearsalSongMusicianRepository.create({
               rehearsalSong: { id: savedRehearsalSong.id } as RehearsalSong,
-              user: { id: musicianDto.userId } as User,
+              user: musicianDto.userId ? { id: musicianDto.userId } as User : undefined,
               musicianName: musicianDto.musicianName,
               role: musicianDto.role,
               instrument: musicianDto.instrument,
@@ -323,9 +327,9 @@ export class RehearsalService {
       }
     }
 
-    // Check if user has permission to update (either SUPER_ADMIN or the creator)
-    if (rehearsal.createdById !== userId && !isSuperAdmin) {
-      throw new ForbiddenException('You can only update rehearsals you created');
+    // Check if user has permission to update (either SUPER_ADMIN, the creator, or the shift lead)
+    if (rehearsal.createdById !== userId && rehearsal.shiftLeadId !== userId && !isSuperAdmin) {
+      throw new ForbiddenException('You can only update rehearsals you created or where you are the shift lead');
     }
 
     // Update basic fields
@@ -351,7 +355,19 @@ export class RehearsalService {
       rehearsal.performanceId = updateRehearsalDto.performanceId;
     }
     if (updateRehearsalDto.rehearsalLeadId !== undefined) {
-      rehearsal.rehearsalLeadId = updateRehearsalDto.rehearsalLeadId;
+      if (updateRehearsalDto.rehearsalLeadId === null || updateRehearsalDto.rehearsalLeadId === 0) {
+        rehearsal.rehearsalLeadId = null;
+      } else {
+        const rehearsalLead = await this.userRepository.findOneBy({ id: updateRehearsalDto.rehearsalLeadId });
+        if (!rehearsalLead) {
+          throw new NotFoundException(`Rehearsal lead with ID ${updateRehearsalDto.rehearsalLeadId} not found`);
+        }
+        // Verify the assigned rehearsal lead is actually a LEAD user
+        if (!rehearsalLead.categories?.includes(UserCategory.LEAD)) {
+          throw new BadRequestException(`User with ID ${updateRehearsalDto.rehearsalLeadId} is not a LEAD user`);
+        }
+        rehearsal.rehearsalLeadId = updateRehearsalDto.rehearsalLeadId;
+      }
     }
     if (updateRehearsalDto.isTemplate !== undefined) {
       rehearsal.isTemplate = updateRehearsalDto.isTemplate;
@@ -537,12 +553,16 @@ export class RehearsalService {
           // Musicians assigned for this rehearsal
           musicians: song.musicians?.map(musician => ({
             id: musician.id,
-            user: {
+            // For registered users
+            user: musician.user ? {
               id: musician.user.id,
               firstName: musician.user.firstName,
               lastName: musician.user.lastName,
               email: musician.user.email
-            },
+            } : null,
+            // For external musicians (not in the system)
+            musicianName: musician.musicianName || null,
+            role: musician.role,
             instrument: musician.instrument,
             notes: musician.notes,
             practiceNotes: musician.practiceNotes,
@@ -755,10 +775,14 @@ export class RehearsalService {
 
       const savedRehearsalSong = await this.rehearsalSongRepository.save(rehearsalSong);
 
-      // Handle lead singers for this song
+      // Handle lead singers for this song (optional)
       if (songDto.leadSingerIds && songDto.leadSingerIds.length > 0) {
         const leadSingers = await this.userRepository.findBy({ id: In(songDto.leadSingerIds) });
         savedRehearsalSong.leadSinger = leadSingers;
+        await this.rehearsalSongRepository.save(savedRehearsalSong);
+      } else {
+        // Explicitly set to empty array if not provided
+        savedRehearsalSong.leadSinger = [];
         await this.rehearsalSongRepository.save(savedRehearsalSong);
       }
 
@@ -774,7 +798,7 @@ export class RehearsalService {
         for (const musicianDto of songDto.musicians) {
           const musician = this.rehearsalSongMusicianRepository.create({
             rehearsalSong: { id: savedRehearsalSong.id } as RehearsalSong,
-            user: { id: musicianDto.userId } as User,
+            user: musicianDto.userId ? { id: musicianDto.userId } as User : undefined,
             musicianName: musicianDto.musicianName,
             role: musicianDto.role,
             instrument: musicianDto.instrument,
@@ -970,9 +994,14 @@ export class RehearsalService {
       const savedRehearsalSong = await this.rehearsalSongRepository.save(rehearsalSong);
 
       // Copy lead singers
+      // Handle lead singers from template (optional)
       if (templateSong.leadSinger && templateSong.leadSinger.length > 0) {
         const leadSingers = await this.userRepository.findBy({ id: In(templateSong.leadSinger.map((singer: any) => singer.id)) });
         savedRehearsalSong.leadSinger = leadSingers;
+        await this.rehearsalSongRepository.save(savedRehearsalSong);
+      } else {
+        // Explicitly set to empty array if not provided
+        savedRehearsalSong.leadSinger = [];
         await this.rehearsalSongRepository.save(savedRehearsalSong);
       }
 
@@ -989,7 +1018,7 @@ export class RehearsalService {
         const musicians = templateSong.musicians.map((musician: any) => 
           this.rehearsalSongMusicianRepository.create({
             rehearsalSong: { id: savedRehearsalSong.id } as RehearsalSong,
-            user: { id: musician.user.id } as User,
+            user: musician.user?.id ? { id: musician.user.id } as User : undefined,
             musicianName: musician.musicianName,
             role: musician.role,
             instrument: musician.instrument,
@@ -1086,15 +1115,18 @@ export class RehearsalService {
     // Update the rehearsal song properties (songId cannot be changed)
     // Only update rehearsal-specific properties: difficulty, needsWork, order, 
     // timeAllocated, focusPoints, notes, musicalKey, musicians, voice parts
-    await this.rehearsalSongRepository.update(songId, {
-      difficulty: updateData.difficulty,
-      needsWork: updateData.needsWork,
-      order: updateData.order,
-      timeAllocated: updateData.timeAllocated,
-      focusPoints: updateData.focusPoints,
-      notes: updateData.notes,
-      musicalKey: updateData.musicalKey,
-    });
+    const updateFields: any = {};
+    if (updateData.difficulty !== undefined) updateFields.difficulty = updateData.difficulty;
+    if (updateData.needsWork !== undefined) updateFields.needsWork = updateData.needsWork;
+    if (updateData.order !== undefined) updateFields.order = updateData.order;
+    if (updateData.timeAllocated !== undefined) updateFields.timeAllocated = updateData.timeAllocated;
+    if (updateData.focusPoints !== undefined) updateFields.focusPoints = updateData.focusPoints;
+    if (updateData.notes !== undefined) updateFields.notes = updateData.notes;
+    if (updateData.musicalKey !== undefined) updateFields.musicalKey = updateData.musicalKey;
+    
+    if (Object.keys(updateFields).length > 0) {
+      await this.rehearsalSongRepository.update(songId, updateFields);
+    }
 
     // Update lead singers if provided
     if (updateData.leadSingerIds !== undefined) {

@@ -50,6 +50,15 @@ export class CreatePerformanceDto {
   shiftLeadId?: number;
 
   @ApiPropertyOptional({
+    description: 'ID of an assistant/helping lead (optional)',
+    example: 124,
+    type: Number
+  })
+  @IsOptional()
+  @IsNumber()
+  assistantLeadId?: number;
+
+  @ApiPropertyOptional({
     description: 'Additional notes for the performance',
     example: 'Sunday evening service',
     type: String

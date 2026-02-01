@@ -172,6 +172,41 @@ export class SongController {
     return SongResponseDto.fromEntity(song);
   }
 
+  @Get(':id/performance-count')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
+  async getPerformanceCount(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('includeAll') includeAll?: string
+  ): Promise<{
+    songId: number;
+    storedCount: number;
+    actualCount: number;
+    totalCount: number; // Total performances (all statuses)
+    lastPerformed: Date | null;
+    performances: Array<{ performanceId: number; date: Date; status: string; type: string; location: string | null }>;
+  }> {
+    const song = await this.songService.findOne(id);
+    const performanceData = await this.songService.calculatePerformanceCount(id, includeAll === 'true');
+    
+    return {
+      songId: id,
+      storedCount: song.times_performed,
+      actualCount: performanceData.count,
+      totalCount: performanceData.totalCount,
+      lastPerformed: performanceData.lastPerformed,
+      performances: performanceData.performances,
+    };
+  }
+
+  @Post(':id/sync-performance-count')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)
+  async syncPerformanceCount(@Param('id', ParseIntPipe) id: number): Promise<SongResponseDto> {
+    const song = await this.songService.syncPerformanceCount(id);
+    return SongResponseDto.fromEntity(song);
+  }
+
   @Patch('bulk/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(AdminRole.SUPER_ADMIN, UserCategory.LEAD)

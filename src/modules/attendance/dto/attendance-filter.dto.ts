@@ -1,4 +1,4 @@
-import { IsOptional, IsEnum, IsString, IsNumber, IsDate } from 'class-validator';
+import { IsOptional, IsEnum, IsString, IsNumber, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { AttendanceEventType, AttendanceStatus } from '../attendance.entity';
 
@@ -8,14 +8,12 @@ export class AttendanceFilterDto {
     search?: string;
 
     @IsOptional()
-    @Type(() => Date)
-    @IsDate()
-    startDate?: Date;
+    @IsDateString()
+    startDate?: string;
 
     @IsOptional()
-    @Type(() => Date)
-    @IsDate()
-    endDate?: Date;
+    @IsDateString()
+    endDate?: string;
 
     @IsOptional()
     @IsNumber()

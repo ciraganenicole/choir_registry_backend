@@ -1,18 +1,16 @@
-import { IsOptional, IsNumber, IsString, IsDate, IsEnum, IsBoolean } from 'class-validator';
+import { IsOptional, IsNumber, IsString, IsDateString, IsEnum, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TransactionType, IncomeCategories, ExpenseCategories, SubCategories } from '../enums/transactions-categories.enum';
 import { Currency } from '../transaction.entity';
 
 export class TransactionFilterDto {
     @IsOptional()
-    @Type(() => Date)
-    @IsDate()
-    startDate?: Date | string;
+    @IsDateString()
+    startDate?: string;
 
     @IsOptional()
-    @Type(() => Date)
-    @IsDate()
-    endDate?: Date | string;
+    @IsDateString()
+    endDate?: string;
 
     @IsOptional()
     @IsEnum(TransactionType)

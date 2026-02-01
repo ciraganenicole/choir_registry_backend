@@ -4,5 +4,6 @@ export enum UserCategory {
     WORSHIPPER = 'WORSHIPPER',
     COMMITTEE = 'COMMITTEE',
     NEWCOMER = 'NEWCOMER',
-    LEAD = 'LEAD'
+    LEAD = 'LEAD',
+    MUSICIAN = 'MUSICIAN',
 } 

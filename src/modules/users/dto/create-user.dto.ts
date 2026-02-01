@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, IsEmail, IsBoolean, IsDate } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsEmail, IsBoolean, IsDateString } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { Gender } from '../enums/gender.enum';
 import { MaritalStatus } from '../enums/marital-status.enum';
@@ -88,9 +88,8 @@ export class CreateUserDto {
   voiceCategory?: string;
 
   @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  joinDate?: Date;
+  @IsDateString()
+  joinDate?: string;
 
   @IsBoolean()
   @IsOptional()

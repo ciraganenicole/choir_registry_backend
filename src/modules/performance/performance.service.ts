@@ -78,6 +78,19 @@ export class PerformanceService {
       }
     }
 
+    // Verify assistant lead exists and is a LEAD user (only if provided)
+    if (createPerformanceDto.assistantLeadId) {
+      const assistantLead = await this.userRepository.findOneBy({ id: createPerformanceDto.assistantLeadId });
+      if (!assistantLead) {
+        throw new NotFoundException(`Assistant lead with ID ${createPerformanceDto.assistantLeadId} not found`);
+      }
+
+      // Verify the assigned assistant lead is actually a LEAD user
+      if (!assistantLead.categories?.includes(UserCategory.LEAD)) {
+        throw new BadRequestException(`User with ID ${createPerformanceDto.assistantLeadId} is not a LEAD user`);
+      }
+    }
+
     // Allow creating performances for future dates (planning ahead)
     const performanceDate = new Date(createPerformanceDto.date);
     const now = new Date();
@@ -97,6 +110,7 @@ export class PerformanceService {
       expectedAudience: createPerformanceDto.expectedAudience,
       type: createPerformanceDto.type,
       shiftLeadId: createPerformanceDto.shiftLeadId,
+      assistantLeadId: createPerformanceDto.assistantLeadId,
       notes: createPerformanceDto.notes,
       status: createPerformanceDto.status || PerformanceStatus.UPCOMING,
     });
@@ -110,7 +124,8 @@ export class PerformanceService {
 
     const queryBuilder = this.performanceRepository
       .createQueryBuilder('performance')
-      .leftJoinAndSelect('performance.shiftLead', 'shiftLead');
+      .leftJoinAndSelect('performance.shiftLead', 'shiftLead')
+      .leftJoinAndSelect('performance.assistantLead', 'assistantLead');
 
     // Apply filters
     if (search) {
@@ -157,6 +172,7 @@ export class PerformanceService {
       where: { id },
       relations: [
         'shiftLead',
+        'assistantLead',
         'performanceSongs',
         'performanceSongs.song',
         'performanceSongs.leadSinger',
@@ -250,6 +266,25 @@ export class PerformanceService {
       }
     }
 
+    // Update assistant lead if provided
+    if (updatePerformanceDto.assistantLeadId !== undefined) {
+      if (updatePerformanceDto.assistantLeadId === null || updatePerformanceDto.assistantLeadId === 0) {
+        performance.assistantLeadId = null;
+      } else {
+        const assistantLead = await this.userRepository.findOneBy({ id: updatePerformanceDto.assistantLeadId });
+        if (!assistantLead) {
+          throw new BadRequestException(`Assistant lead with ID ${updatePerformanceDto.assistantLeadId} not found`);
+        }
+        
+        // Verify the assigned assistant lead is actually a LEAD user
+        if (!assistantLead.categories?.includes(UserCategory.LEAD)) {
+          throw new BadRequestException(`User with ID ${updatePerformanceDto.assistantLeadId} is not a LEAD user`);
+        }
+        
+        performance.assistantLeadId = updatePerformanceDto.assistantLeadId;
+      }
+    }
+
     // Save the updated performance
     await this.performanceRepository.save(performance);
 
@@ -285,6 +320,7 @@ export class PerformanceService {
       where: { shiftLeadId: userId },
       relations: [
         'shiftLead',
+        'assistantLead',
       ],
       order: { date: 'DESC' },
     });
@@ -297,6 +333,7 @@ export class PerformanceService {
     const queryBuilder = this.performanceRepository
       .createQueryBuilder('performance')
       .leftJoinAndSelect('performance.shiftLead', 'shiftLead')
+      .leftJoinAndSelect('performance.assistantLead', 'assistantLead')
       .where('performance.shiftLeadId IS NULL');
 
     // Apply filters
@@ -337,7 +374,7 @@ export class PerformanceService {
 
   async getStats(): Promise<PerformanceStats> {
     const performances = await this.performanceRepository.find({
-      relations: ['shiftLead'],
+      relations: ['shiftLead', 'assistantLead'],
     });
 
     const stats: PerformanceStats = {
@@ -610,9 +647,10 @@ export class PerformanceService {
     // Get the performance
     const performance = await this.findOne(performanceId);
     
-    // Check if performance is in preparation status
-    if (performance.status !== PerformanceStatus.IN_PREPARATION) {
-      throw new BadRequestException(`Performance must be in 'in_preparation' status to replace with rehearsal. Current status: ${performance.status}`);
+    // Check if performance is in a valid status for replacement (in_preparation or completed)
+    // Allow replacing in completed performances for historical updates/corrections
+    if (performance.status !== PerformanceStatus.IN_PREPARATION && performance.status !== PerformanceStatus.COMPLETED) {
+      throw new BadRequestException(`Performance must be in 'in_preparation' or 'completed' status to replace with rehearsal. Current status: ${performance.status}`);
     }
     
     // Use a transaction to ensure data consistency
@@ -791,9 +829,10 @@ export class PerformanceService {
     // Get the performance
     const performance = await this.findOne(performanceId);
     
-    // Check if performance is in preparation status
-    if (performance.status !== PerformanceStatus.IN_PREPARATION) {
-      throw new BadRequestException(`Performance must be in 'in_preparation' status to promote a rehearsal. Current status: ${performance.status}`);
+    // Check if performance is in a valid status for promotion (in_preparation or completed)
+    // Allow promoting to completed performances for historical updates/corrections
+    if (performance.status !== PerformanceStatus.IN_PREPARATION && performance.status !== PerformanceStatus.COMPLETED) {
+      throw new BadRequestException(`Performance must be in 'in_preparation' or 'completed' status to promote a rehearsal. Current status: ${performance.status}`);
     }
     
     // Use a transaction to ensure data consistency

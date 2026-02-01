@@ -52,7 +52,6 @@
     "cbor2": "^1.11.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
-    "cloudinary": "^2.5.1",
     "cors": "^2.8.5",
     "csv-parse": "^5.6.0",
     "date-fns": "^4.1.0",
