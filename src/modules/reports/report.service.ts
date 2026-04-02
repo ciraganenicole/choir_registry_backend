@@ -21,14 +21,12 @@ export class ReportService {
   ) {}
 
   private async getUserInfo(userId: number | string): Promise<ReportUser> {
-    console.log('getUserInfo called with userId:', userId);
     
     // First try to find as admin user (admin users have priority)
     const adminUserId = typeof userId === 'string' ? parseInt(userId) : userId;
     if (!isNaN(adminUserId)) {
       const adminUser = await this.adminUserRepository.findOneBy({ id: adminUserId });
       if (adminUser) {
-        console.log('Found admin user:', adminUser);
         return {
           id: adminUser.id,
           type: 'admin',

@@ -61,5 +61,5 @@ export class Song {
   added_by?: User;
 
   @Column({ nullable: true })
-  addedById?: number;
+  addedById?: number | null;
 } 

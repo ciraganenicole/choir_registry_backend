@@ -22,7 +22,7 @@ export class SongResponseDto {
   performed: number;
   lastPerformance?: string;
   added_by?: UserResponseDto;
-  addedById?: number;
+  addedById?: number | null;
   createdAt?: string;
   updatedAt?: string;
 

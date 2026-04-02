@@ -32,14 +32,12 @@ export class SongService {
   ) {}
 
   private async getUserInfo(userId: number | string): Promise<SongUser> {
-    console.log('getUserInfo called with userId:', userId);
     
     // First try to find as admin user (admin users have priority)
     const adminUserId = typeof userId === 'string' ? parseInt(userId) : userId;
     if (!isNaN(adminUserId)) {
       const adminUser = await this.adminUserRepository.findOneBy({ id: adminUserId });
       if (adminUser) {
-        console.log('Found admin user:', adminUser);
         return {
           id: adminUser.id,
           type: 'admin',
@@ -178,11 +176,11 @@ export class SongService {
     // Get the user entity for the relationship
     let userEntity;
     if (user.type === 'admin' && user.role === 'SUPER_ADMIN') {
-      // For admin users, we need to handle this differently since they're not in the users table
-      // We'll create the song without the added_by relationship for admin users
+      // Admin users are in admin_users table, not users. The added_by FK references users.
+      // Use null for admin-created songs since we can't reference admin_users.
       const song = this.songRepository.create({ 
         ...createSongDto, 
-        addedById: 0, // Use 0 to indicate admin-created song
+        addedById: null,
         last_performed: createSongDto.last_performed ? new Date(createSongDto.last_performed) : undefined
       });
       return this.songRepository.save(song);

@@ -8,8 +8,6 @@ import {
   ParseIntPipe,
   ValidationPipe,
   UsePipes,
-  DefaultValuePipe,
-  Header,
   Delete,
   Put,
   UseGuards
@@ -77,6 +75,12 @@ export class TransactionController {
 
   @Get('daily')
   @Roles(AdminRole.FINANCE_ADMIN, AdminRole.SUPER_ADMIN)
+  @UsePipes(new ValidationPipe({ transform: true }))
+  @ApiOperation({
+    summary: 'Daily contributions',
+    description:
+      'Use exportAll=true to fetch all matching rows (capped server-side). Do not use a huge limit as a workaround.',
+  })
   async getDailyContributions(@Query() filterDto: DailyContributionFilterDto) {
     return this.transactionService.getDailyContributions(filterDto);
   }

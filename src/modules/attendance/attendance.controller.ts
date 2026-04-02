@@ -18,13 +18,11 @@ import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { AttendanceFilterDto } from './dto/attendance-filter.dto';
 import { JustificationReason } from './attendance.entity';
-import { 
-    ApiTags, 
-    ApiOperation, 
+import {
+    ApiTags,
+    ApiOperation,
     ApiResponse,
     ApiBearerAuth,
-    ApiQuery,
-    ApiParam 
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';

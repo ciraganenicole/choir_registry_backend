@@ -1,4 +1,4 @@
-import { IsOptional, IsDateString, IsNumber, IsString } from 'class-validator';
+import { IsOptional, IsDateString, IsNumber, IsString, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class DailyContributionFilterDto {
@@ -28,6 +28,14 @@ export class DailyContributionFilterDto {
   @Type(() => Number)
   @IsNumber()
   limit?: number = 10;
+
+  /**
+   * When true, return all rows matching filters (no page/limit). Still bounded by a server-side max in the service.
+   */
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  exportAll?: boolean;
 
   @IsOptional()
   @IsString()

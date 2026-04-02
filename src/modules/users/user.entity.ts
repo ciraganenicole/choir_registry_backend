@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, BeforeInsert, ManyToOne, JoinColumn, AfterInsert, ManyToMany, JoinTable, EntityManager } from 'typeorm';
 import { Gender } from './enums/gender.enum';
 import { MaritalStatus } from './enums/marital-status.enum';
@@ -135,6 +136,7 @@ export class User {
     })
     categories: UserCategory[];
 
+    @Exclude()
     @Column({ nullable: true })
     fingerprintData: string;
 
@@ -150,6 +152,7 @@ export class User {
     @Column({ nullable: true })
     profileImageUrl: string; // URL to profile image
 
+    @Exclude()
     @Column({ nullable: true })
     password: string; // For regular user authentication
 

@@ -1,23 +1,75 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, FindOptionsWhere, Like } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Transaction, Currency } from './transaction.entity';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { TransactionFilterDto } from './dto/transaction-filter.dto';
 import { User } from '../users/user.entity';
-import { TransactionType, isCategoryValidForType, SubCategories } from './enums/transactions-categories.enum';
+import {
+  TransactionType,
+  isCategoryValidForType,
+  SubCategories,
+  IncomeCategories,
+} from './enums/transactions-categories.enum';
 import { DailyContributionFilterDto } from './dto/daily-contribution.dto';
-import { format, subMonths } from 'date-fns';
+import { format } from 'date-fns';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import {
+  PaginationMetaDto,
+  MAX_EXPORT_ROWS,
+  buildPaginationMeta,
+  resolvePagination,
+} from './dto/pagination-meta.dto';
 
 @Injectable()
 export class TransactionService {
+  /** Scalar user columns for contributor relation (no password / fingerprintData loaded from DB). */
+  private static readonly CONTRIBUTOR_SELECT: (keyof User)[] = [
+    'id',
+    'firstName',
+    'lastName',
+    'email',
+    'matricule',
+    'phoneNumber',
+    'whatsappNumber',
+    'phone',
+    'categories',
+    'commissions',
+    'gender',
+    'maritalStatus',
+    'educationLevel',
+    'profession',
+    'competenceDomain',
+    'churchOfOrigin',
+    'commune',
+    'quarter',
+    'reference',
+    'address',
+    'joinDate',
+    'isActive',
+    'profileImageUrl',
+    'voiceCategory',
+    'createdAt',
+    'updatedAt',
+  ];
+
   constructor(
     @InjectRepository(Transaction)
     private readonly transactionRepository: Repository<Transaction>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
   ) {}
+
+  private async loadContributorPublic(id: number): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      select: [...TransactionService.CONTRIBUTOR_SELECT],
+    });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+    return user;
+  }
 
   async create(createTransactionDto: CreateTransactionDto): Promise<Transaction> {
     const transaction = new Transaction();
@@ -45,12 +97,7 @@ export class TransactionService {
     } 
     // Handle internal contributor
     else if (createTransactionDto.contributorId) {
-      const user = await this.userRepository.findOne({
-        where: { id: createTransactionDto.contributorId }
-      });
-      if (!user) {
-        throw new NotFoundException(`User with ID ${createTransactionDto.contributorId} not found`);
-      }
+      const user = await this.loadContributorPublic(createTransactionDto.contributorId);
       transaction.contributor = user;
       transaction.contributorId = user.id;
     }
@@ -58,71 +105,113 @@ export class TransactionService {
     return this.transactionRepository.save(transaction);
   }
 
-  async findAll(filterDto: TransactionFilterDto): Promise<{ data: Transaction[]; total: number }> {
-    const { startDate, endDate, type, category, subcategory, contributorId, currency, search, page = 1, limit = 10 } = filterDto;
-    const skip = (page - 1) * limit;
-
-    const queryBuilder = this.transactionRepository
-      .createQueryBuilder('transaction')
-      .leftJoinAndSelect('transaction.contributor', 'contributor');
+  private applyTransactionListFilters(
+    qb: SelectQueryBuilder<Transaction>,
+    filterDto: TransactionFilterDto,
+  ): void {
+    const { startDate, endDate, type, category, subcategory, contributorId, currency, search } =
+      filterDto;
 
     if (startDate && endDate) {
-      // Extract date part from ISO strings
       const startDateStr = startDate.split('T')[0];
       const endDateStr = endDate.split('T')[0];
 
-      queryBuilder.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+      qb.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
         startDate: startDateStr,
         endDate: endDateStr,
       });
     }
 
     if (type) {
-      queryBuilder.andWhere('transaction.type = :type', { type });
+      qb.andWhere('transaction.type = :type', { type });
     }
 
     if (category) {
       if (type && !isCategoryValidForType(category, type)) {
         throw new BadRequestException('Invalid category for the specified transaction type');
       }
-      queryBuilder.andWhere('transaction.category = :category', { category });
+      qb.andWhere('transaction.category = :category', { category });
     }
 
     if (subcategory) {
-      queryBuilder.andWhere('transaction.subcategory = :subcategory', { subcategory });
+      qb.andWhere('transaction.subcategory = :subcategory', { subcategory });
     }
 
     if (contributorId) {
-      queryBuilder.andWhere('transaction.contributorId = :contributorId', { contributorId });
+      qb.andWhere('transaction.contributorId = :contributorId', { contributorId });
     }
 
     if (currency) {
-      queryBuilder.andWhere('transaction.currency = :currency', { currency });
+      qb.andWhere('transaction.currency = :currency', { currency });
     }
 
     if (search) {
-      queryBuilder.andWhere(
+      qb.andWhere(
         '(LOWER(contributor.firstName) LIKE LOWER(:search) OR LOWER(contributor.lastName) LIKE LOWER(:search) OR LOWER(transaction.externalContributorName) LIKE LOWER(:search))',
-        { search: `%${search}%` }
+        { search: `%${search}%` },
       );
     }
+  }
 
-    queryBuilder
+  /**
+   * Paginated transaction list. Sorting and slicing happen in SQL (LIMIT/OFFSET), not in memory.
+   * Use `meta` for UI paging; `total` is duplicated at the root for older clients.
+   */
+  async findAll(
+    filterDto: TransactionFilterDto,
+  ): Promise<{ data: Transaction[]; total: number; meta: PaginationMetaDto }> {
+    const pagination = resolvePagination({
+      page: filterDto.page,
+      limit: filterDto.limit,
+      exportAll: filterDto.exportAll,
+    });
+
+    const countQb = this.transactionRepository.createQueryBuilder('transaction');
+    if (filterDto.search) {
+      countQb.leftJoin('transaction.contributor', 'contributor');
+    }
+    this.applyTransactionListFilters(countQb, filterDto);
+    const countRow = await countQb
+      .select('COUNT(DISTINCT transaction.id)', 'cnt')
+      .getRawOne();
+    const total = Number(countRow?.cnt ?? 0);
+
+    const dataQb = this.transactionRepository.createQueryBuilder('transaction');
+    dataQb.leftJoinAndSelect('transaction.contributor', 'contributor');
+    this.applyTransactionListFilters(dataQb, filterDto);
+    dataQb
       .orderBy('transaction.transactionDate', 'DESC')
-      .addOrderBy('transaction.createdAt', 'DESC')
-      .skip(skip)
-      .take(limit);
+      .addOrderBy('transaction.createdAt', 'DESC');
 
-    const [transactions, total] = await queryBuilder.getManyAndCount();
+    if (pagination.mode === 'export') {
+      dataQb.take(pagination.take!);
+    } else {
+      dataQb.skip(pagination.offset).take(pagination.take!);
+    }
 
-    // Ensure amounts are numbers without changing the entity structure
-    transactions.forEach(transaction => {
+    const transactions = await dataQb.getMany();
+
+    transactions.forEach((transaction) => {
       transaction.amount = Number(transaction.amount) || 0;
     });
 
+    const meta =
+      pagination.mode === 'export'
+        ? ({
+            page: 1,
+            limit: transactions.length,
+            total,
+            totalPages: 1,
+            hasNextPage: total > transactions.length,
+            hasPreviousPage: false,
+            truncated: total > transactions.length,
+          } satisfies PaginationMetaDto)
+        : buildPaginationMeta(total, pagination.page, pagination.limit);
+
     return {
       data: transactions,
-      total
+      total,
+      meta,
     };
   }
 
@@ -154,12 +243,7 @@ export class TransactionService {
       transaction.contributorId = null;
       transaction.contributor = null;
     } else if (contributorId) {
-      const user = await this.userRepository.findOne({
-        where: { id: contributorId }
-      });
-      if (!user) {
-        throw new NotFoundException(`User with ID ${contributorId} not found`);
-      }
+      const user = await this.loadContributorPublic(contributorId);
       transaction.contributor = user;
       transaction.contributorId = user.id;
     }
@@ -178,13 +262,13 @@ export class TransactionService {
     }
   }
 
-  async generateReport(filters: TransactionFilterDto): Promise<any> {
+  private buildReportBaseQuery(filters: TransactionFilterDto): SelectQueryBuilder<Transaction> {
     const query = this.transactionRepository.createQueryBuilder('transaction');
 
     if (filters.startDate && filters.endDate) {
       query.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
         startDate: filters.startDate,
-        endDate: filters.endDate
+        endDate: filters.endDate,
       });
     }
 
@@ -200,48 +284,55 @@ export class TransactionService {
     }
 
     if (filters.contributorId) {
-      query.andWhere('transaction.contributorId = :contributorId', { 
-        contributorId: filters.contributorId 
+      query.andWhere('transaction.contributorId = :contributorId', {
+        contributorId: filters.contributorId,
       });
     }
 
-    const summary = await query
-      .select([
-        'transaction.category',
-        'transaction.type',
-        'SUM(transaction.amount) as total',
-        'COUNT(*) as count'
-      ])
-      .groupBy('transaction.category, transaction.type')
+    return query;
+  }
+
+  async generateReport(filters: TransactionFilterDto): Promise<any> {
+    const base = this.buildReportBaseQuery(filters);
+
+    const summary = await base
+      .clone()
+      .select('transaction.category', 'category')
+      .addSelect('transaction.type', 'type')
+      .addSelect('SUM("transaction"."amount"::numeric)', 'total')
+      .addSelect('COUNT(*)', 'count')
+      .groupBy('transaction.category')
+      .addGroupBy('transaction.type')
       .getRawMany();
 
-    const total = await query
-      .select('SUM(transaction.amount)', 'total')
+    const totalRow = await base
+      .clone()
+      .select('COALESCE(SUM("transaction"."amount"::numeric), 0)', 'total')
       .getRawOne();
 
     return {
       summary,
-      total: total.total || 0,
-      filters
+      total: Number(totalRow?.total ?? 0),
+      filters,
     };
   }
 
-  async getUserContributions(
+  private buildUserContributionsBaseQuery(
     userId: number,
-    filters: TransactionFilterDto
-  ): Promise<any> {
-    const query = this.transactionRepository.createQueryBuilder('transaction')
+    filters: TransactionFilterDto,
+  ): SelectQueryBuilder<Transaction> {
+    const query = this.transactionRepository
+      .createQueryBuilder('transaction')
       .where('transaction.contributorId = :userId', { userId })
       .andWhere('transaction.type = :type', { type: TransactionType.INCOME });
 
     if (filters.startDate && filters.endDate) {
-      // Extract date part from ISO strings
       const startDateStr = filters.startDate.split('T')[0];
       const endDateStr = filters.endDate.split('T')[0];
-      
+
       query.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
         startDate: startDateStr,
-        endDate: endDateStr
+        endDate: endDateStr,
       });
     }
 
@@ -252,156 +343,216 @@ export class TransactionService {
       query.andWhere('transaction.category = :category', { category: filters.category });
     }
 
-    const contributions = await query
-      .select([
-        'transaction.category',
-        'SUM(transaction.amount) as total',
-        'COUNT(*) as count'
-      ])
+    return query;
+  }
+
+  async getUserContributions(
+    userId: number,
+    filters: TransactionFilterDto,
+  ): Promise<any> {
+    const base = this.buildUserContributionsBaseQuery(userId, filters);
+
+    const contributions = await base
+      .clone()
+      .select('transaction.category', 'category')
+      .addSelect('SUM("transaction"."amount"::numeric)', 'total')
+      .addSelect('COUNT(*)', 'count')
       .groupBy('transaction.category')
       .getRawMany();
 
-    const total = await query
-      .select('SUM(transaction.amount)', 'total')
+    const totalRow = await base
+      .clone()
+      .select('COALESCE(SUM("transaction"."amount"::numeric), 0)', 'total')
       .getRawOne();
 
     return {
       contributions,
-      total: total.total || 0,
-      filters
+      total: Number(totalRow?.total ?? 0),
+      filters,
     };
   }
 
-  async getStats(startDate?: string, endDate?: string, filterDto?: TransactionFilterDto) {
-    // Build query without default date filtering
-    const query = this.transactionRepository.createQueryBuilder('transaction');
-    
-    // Only apply date filtering if dates are explicitly provided
+  private buildStatsBaseQuery(
+    startDate?: string,
+    endDate?: string,
+    filterDto?: TransactionFilterDto,
+  ): SelectQueryBuilder<Transaction> {
+    const qb = this.transactionRepository.createQueryBuilder('transaction');
+
     if (startDate || endDate) {
       const startDateStr = startDate ? startDate.split('T')[0] : undefined;
       const endDateStr = endDate ? endDate.split('T')[0] : undefined;
 
       if (startDateStr) {
-        query.andWhere('transaction.transactionDate >= :startDate', { startDate: startDateStr });
+        qb.andWhere('transaction.transactionDate >= :startDate', { startDate: startDateStr });
       }
       if (endDateStr) {
-        query.andWhere('transaction.transactionDate <= :endDate', { endDate: endDateStr });
+        qb.andWhere('transaction.transactionDate <= :endDate', { endDate: endDateStr });
       }
     }
 
-    // Apply additional filters if provided
     if (filterDto) {
       if (filterDto.type) {
-        query.andWhere('transaction.type = :type', { type: filterDto.type });
+        qb.andWhere('transaction.type = :type', { type: filterDto.type });
       }
       if (filterDto.category) {
-        query.andWhere('transaction.category = :category', { category: filterDto.category });
+        qb.andWhere('transaction.category = :category', { category: filterDto.category });
       }
       if (filterDto.subcategory) {
-        query.andWhere('transaction.subcategory = :subcategory', { subcategory: filterDto.subcategory });
+        qb.andWhere('transaction.subcategory = :subcategory', { subcategory: filterDto.subcategory });
       }
       if (filterDto.contributorId) {
-        query.andWhere('transaction.contributorId = :contributorId', { contributorId: filterDto.contributorId });
+        qb.andWhere('transaction.contributorId = :contributorId', {
+          contributorId: filterDto.contributorId,
+        });
       }
       if (filterDto.currency) {
-        query.andWhere('transaction.currency = :currency', { currency: filterDto.currency });
+        qb.andWhere('transaction.currency = :currency', { currency: filterDto.currency });
       }
       if (filterDto.search) {
-        query.leftJoinAndSelect('transaction.contributor', 'contributor');
-        query.andWhere(
+        qb.leftJoin('transaction.contributor', 'contributor');
+        qb.andWhere(
           '(LOWER(contributor.firstName) LIKE LOWER(:search) OR LOWER(contributor.lastName) LIKE LOWER(:search) OR LOWER(transaction.externalContributorName) LIKE LOWER(:search))',
-          { search: `%${filterDto.search}%` }
+          { search: `%${filterDto.search}%` },
         );
       }
     }
 
-    const transactions = await query.getMany();
+    return qb;
+  }
 
-    // Separate incomes and expenses by currency
-    let totalIncome = { usd: 0, fc: 0 };
-    let totalExpense = { usd: 0, fc: 0 };
+  async getStats(startDate?: string, endDate?: string, filterDto?: TransactionFilterDto) {
+    const base = this.buildStatsBaseQuery(startDate, endDate, filterDto);
+    const ti = TransactionType.INCOME;
+    const te = TransactionType.EXPENSE;
+    const usd = Currency.USD;
+    const fc = Currency.FC;
 
-    // Monthly breakdown
-    const monthlyBreakdown = transactions.reduce((acc, transaction) => {
-      const month = new Date(transaction.transactionDate).toISOString().slice(0, 7); // YYYY-MM
-      if (!acc[month]) {
-        acc[month] = {
-          income: { usd: 0, fc: 0 },
-          expense: { usd: 0, fc: 0 },
-          solde: { usd: 0, fc: 0 }
-        };
-      }
-      const isIncome = transaction.type === TransactionType.INCOME;
-      const currency = transaction.currency;
-      const amount = Number(transaction.amount);
-      if (isIncome) {
-        if (currency === Currency.USD) {
-          acc[month].income.usd += amount;
-          totalIncome.usd += amount;
-        } else if (currency === Currency.FC) {
-          acc[month].income.fc += amount;
-          totalIncome.fc += amount;
-        }
-      } else {
-        if (currency === Currency.USD) {
-          acc[month].expense.usd += amount;
-          totalExpense.usd += amount;
-        } else if (currency === Currency.FC) {
-          acc[month].expense.fc += amount;
-          totalExpense.fc += amount;
-        }
-      }
-      // Update solde for the month
-      acc[month].solde.usd = acc[month].income.usd - acc[month].expense.usd;
-      acc[month].solde.fc = acc[month].income.fc - acc[month].expense.fc;
-      return acc;
-    }, {} as Record<string, { income: { usd: number; fc: number }, expense: { usd: number; fc: number }, solde: { usd: number; fc: number } }>);
+    const totalsRow = await base
+      .clone()
+      .select(
+        `COALESCE(SUM(CASE WHEN "transaction"."type" = '${ti}' AND "transaction"."currency" = '${usd}' THEN "transaction"."amount"::numeric ELSE 0 END), 0)`,
+        'income_usd',
+      )
+      .addSelect(
+        `COALESCE(SUM(CASE WHEN "transaction"."type" = '${ti}' AND "transaction"."currency" = '${fc}' THEN "transaction"."amount"::numeric ELSE 0 END), 0)`,
+        'income_fc',
+      )
+      .addSelect(
+        `COALESCE(SUM(CASE WHEN "transaction"."type" = '${te}' AND "transaction"."currency" = '${usd}' THEN "transaction"."amount"::numeric ELSE 0 END), 0)`,
+        'expense_usd',
+      )
+      .addSelect(
+        `COALESCE(SUM(CASE WHEN "transaction"."type" = '${te}' AND "transaction"."currency" = '${fc}' THEN "transaction"."amount"::numeric ELSE 0 END), 0)`,
+        'expense_fc',
+      )
+      .getRawOne();
 
-    // Calculate overall solde
+    const totalIncome = {
+      usd: Number(totalsRow?.income_usd ?? 0),
+      fc: Number(totalsRow?.income_fc ?? 0),
+    };
+    const totalExpense = {
+      usd: Number(totalsRow?.expense_usd ?? 0),
+      fc: Number(totalsRow?.expense_fc ?? 0),
+    };
     const solde = {
       usd: totalIncome.usd - totalExpense.usd,
-      fc: totalIncome.fc - totalExpense.fc
+      fc: totalIncome.fc - totalExpense.fc,
     };
 
-    // For backward compatibility, but only for DAILY category
-    const dailyUSDTransactions = transactions.filter(t => t.currency === Currency.USD && t.category === 'DAILY');
-    const dailyFCTransactions = transactions.filter(t => t.currency === Currency.FC && t.category === 'DAILY');
-    const dailyTotalUSD = dailyUSDTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-    const dailyTotalFC = dailyFCTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+    const monthlyRows = await base
+      .clone()
+      .select(`TO_CHAR("transaction"."transactionDate"::date, 'YYYY-MM')`, 'month')
+      .addSelect('transaction.type', 'type')
+      .addSelect('transaction.currency', 'currency')
+      .addSelect('SUM("transaction"."amount"::numeric)', 'sum')
+      .groupBy(`TO_CHAR("transaction"."transactionDate"::date, 'YYYY-MM')`)
+      .addGroupBy('transaction.type')
+      .addGroupBy('transaction.currency')
+      .orderBy(`TO_CHAR("transaction"."transactionDate"::date, 'YYYY-MM')`, 'ASC')
+      .getRawMany();
 
-    // Determine date range for response
-    let dateRange;
+    const monthlyBreakdown: Record<
+      string,
+      {
+        income: { usd: number; fc: number };
+        expense: { usd: number; fc: number };
+        solde: { usd: number; fc: number };
+      }
+    > = {};
+
+    for (const row of monthlyRows) {
+      const month = String(row.month);
+      if (!monthlyBreakdown[month]) {
+        monthlyBreakdown[month] = {
+          income: { usd: 0, fc: 0 },
+          expense: { usd: 0, fc: 0 },
+          solde: { usd: 0, fc: 0 },
+        };
+      }
+      const amount = Number(row.sum);
+      const m = monthlyBreakdown[month];
+      const rowType = row.type ?? row.transaction_type;
+      const rowCurrency = row.currency ?? row.transaction_currency;
+      if (rowType === TransactionType.INCOME) {
+        if (rowCurrency === Currency.USD) m.income.usd += amount;
+        else if (rowCurrency === Currency.FC) m.income.fc += amount;
+      } else {
+        if (rowCurrency === Currency.USD) m.expense.usd += amount;
+        else if (rowCurrency === Currency.FC) m.expense.fc += amount;
+      }
+      m.solde.usd = m.income.usd - m.expense.usd;
+      m.solde.fc = m.income.fc - m.expense.fc;
+    }
+
+    const dailyRow = await base
+      .clone()
+      .andWhere('transaction.category = :dailyCat', { dailyCat: IncomeCategories.DAILY })
+      .select(
+        `COALESCE(SUM(CASE WHEN "transaction"."currency" = '${usd}' THEN "transaction"."amount"::numeric ELSE 0 END), 0)`,
+        'daily_usd',
+      )
+      .addSelect(
+        `COALESCE(SUM(CASE WHEN "transaction"."currency" = '${fc}' THEN "transaction"."amount"::numeric ELSE 0 END), 0)`,
+        'daily_fc',
+      )
+      .getRawOne();
+
+    const dailyTotalUSD = Number(dailyRow?.daily_usd ?? 0);
+    const dailyTotalFC = Number(dailyRow?.daily_fc ?? 0);
+
+    let dateRange: { from: Date | null; to: Date | null };
     if (startDate || endDate) {
-      // Extract date part from ISO strings
       const startDateStr = startDate ? startDate.split('T')[0] : undefined;
       const endDateStr = endDate ? endDate.split('T')[0] : undefined;
-      
       dateRange = {
         from: startDateStr ? new Date(startDateStr) : null,
-        to: endDateStr ? new Date(endDateStr) : null
+        to: endDateStr ? new Date(endDateStr) : null,
       };
     } else {
-      // If no date filter, show the full range of available data
-      const allDates = transactions.map(t => new Date(t.transactionDate)).sort((a, b) => a.getTime() - b.getTime());
+      const rangeRow = await base
+        .clone()
+        .select('MIN("transaction"."transactionDate")', 'min')
+        .addSelect('MAX("transaction"."transactionDate")', 'max')
+        .getRawOne();
       dateRange = {
-        from: allDates.length > 0 ? allDates[0] : null,
-        to: allDates.length > 0 ? allDates[allDates.length - 1] : null
+        from: rangeRow?.min ? new Date(String(rangeRow.min)) : null,
+        to: rangeRow?.max ? new Date(String(rangeRow.max)) : null,
       };
     }
 
-    const result = {
+    return {
       totals: {
         income: totalIncome,
         expense: totalExpense,
-        solde
+        solde,
       },
       monthlyBreakdown,
       dateRange,
       dailyTotalUSD,
-      dailyTotalFC
+      dailyTotalFC,
     };
-
-    return result;
   }
 
   private getPeriods(startDate: Date, endDate: Date, groupBy: 'week' | 'month' | 'year'): string[] {
@@ -466,35 +617,42 @@ export class TransactionService {
       });
     });
 
-    const query = this.transactionRepository
+    const rows = await this.transactionRepository
       .createQueryBuilder('transaction')
-      .leftJoinAndSelect('transaction.contributor', 'contributor')
+      .select('transaction.transactionDate', 'transactionDate')
+      .addSelect('transaction.type', 'type')
+      .addSelect('transaction.currency', 'currency')
+      .addSelect('transaction.amount', 'amount')
       .where('transaction.transactionDate BETWEEN :startDate AND :endDate', {
         startDate: startDateStr,
-        endDate: endDateStr
-      });
+        endDate: endDateStr,
+      })
+      .getRawMany();
 
-    const transactions = await query.getMany();
-
-    transactions.forEach(transaction => {
-      const period = this.getPeriodKey(new Date(transaction.transactionDate), groupBy);
+    for (const row of rows) {
+      const transactionDate = row.transactionDate ?? row.transaction_transactionDate;
+      const period = this.getPeriodKey(new Date(transactionDate as string), groupBy);
       const stat = stats.get(period);
-      if (stat) {
-        if (transaction.type === TransactionType.INCOME) {
-          if (transaction.currency === Currency.USD) {
-            stat.income.usd += Number(transaction.amount);
-          } else {
-            stat.income.fc += Number(transaction.amount);
-          }
+      if (!stat) {
+        continue;
+      }
+      const amount = Number(row.amount ?? row.transaction_amount);
+      const type = row.type ?? row.transaction_type;
+      const currency = row.currency ?? row.transaction_currency;
+      if (type === TransactionType.INCOME) {
+        if (currency === Currency.USD) {
+          stat.income.usd += amount;
         } else {
-          if (transaction.currency === Currency.USD) {
-            stat.expenses.usd += Number(transaction.amount);
-          } else {
-            stat.expenses.fc += Number(transaction.amount);
-          }
+          stat.income.fc += amount;
+        }
+      } else {
+        if (currency === Currency.USD) {
+          stat.expenses.usd += amount;
+        } else {
+          stat.expenses.fc += amount;
         }
       }
-    });
+    }
 
     return Array.from(stats.values());
   }
@@ -515,44 +673,63 @@ export class TransactionService {
       .getMany();
   }
 
+  private applyDailyContributionsFilters(
+    qb: SelectQueryBuilder<Transaction>,
+    filters: DailyContributionFilterDto,
+  ): void {
+    const { startDate, endDate, contributorId, search } = filters;
+
+    qb.where('transaction.category = :category', { category: 'DAILY' }).andWhere(
+      'transaction.type = :type',
+      { type: TransactionType.INCOME },
+    );
+
+    if (startDate && endDate) {
+      const startDateStr = startDate.split('T')[0];
+      const endDateStr = endDate.split('T')[0];
+      qb.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+        startDate: startDateStr,
+        endDate: endDateStr,
+      });
+    }
+
+    if (contributorId) {
+      qb.andWhere('contributor.id = :contributorId', { contributorId });
+    }
+
+    if (search) {
+      qb.andWhere(
+        '(LOWER(contributor.firstName) LIKE LOWER(:search) OR LOWER(contributor.lastName) LIKE LOWER(:search))',
+        { search: `%${search}%` },
+      );
+    }
+  }
+
   async getDailyContributions(filters: DailyContributionFilterDto) {
     try {
-      const { startDate, endDate, contributorId, search, page = 1, limit = 10 } = filters;
-      const skip = (page - 1) * limit;
+      const fullExport = Boolean(filters.exportAll);
+      const pagination = fullExport
+        ? null
+        : resolvePagination({ page: filters.page, limit: filters.limit });
+
+      const countQb = this.transactionRepository
+        .createQueryBuilder('transaction')
+        .leftJoin('transaction.contributor', 'contributor');
+      this.applyDailyContributionsFilters(countQb, filters);
+      const countRow = await countQb
+        .select('COUNT(DISTINCT transaction.id)', 'cnt')
+        .getRawOne();
+      const total = Number(countRow?.cnt ?? 0);
 
       const query = this.transactionRepository
         .createQueryBuilder('transaction')
-        .leftJoinAndSelect('transaction.contributor', 'contributor')
-        .where('transaction.category = :category', { category: 'DAILY' })
-        .andWhere('transaction.type = :type', { type: TransactionType.INCOME });
+        .leftJoinAndSelect('transaction.contributor', 'contributor');
+      this.applyDailyContributionsFilters(query, filters);
 
-      if (startDate && endDate) {
-        // Extract date part from ISO strings for comparison
-        const startDateStr = startDate.split('T')[0];
-        const endDateStr = endDate.split('T')[0];
-
-        query.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-          startDate: startDateStr,
-          endDate: endDateStr,
-        });
-      }
-
-      if (contributorId) {
-        query.andWhere('contributor.id = :contributorId', {
-          contributorId,
-        });
-      }
-
-      if (search) {
-        query.andWhere(
-          '(LOWER(contributor.firstName) LIKE LOWER(:search) OR LOWER(contributor.lastName) LIKE LOWER(:search))',
-          { search: `%${search}%` }
-        );
-      }
-
-      // If limit is very large (e.g., 999999), we're exporting all records
-      if (limit < 999999) {
-        query.skip(skip).take(limit);
+      if (pagination) {
+        query.skip(pagination.offset).take(pagination.take!);
+      } else if (fullExport) {
+        query.take(MAX_EXPORT_ROWS);
       }
 
       const transactions = await query
@@ -593,13 +770,27 @@ export class TransactionService {
       });
 
       // Sort contributors by name
-      const contributors = Array.from(contributorsMap.values())
-        .sort((a, b) => (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName));
+      const contributors = Array.from(contributorsMap.values()).sort((a, b) =>
+        (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName),
+      );
+
+      const meta: PaginationMetaDto = fullExport
+        ? {
+            page: 1,
+            limit: transactions.length,
+            total,
+            totalPages: 1,
+            hasNextPage: total > transactions.length,
+            hasPreviousPage: false,
+            truncated: total > transactions.length,
+          }
+        : buildPaginationMeta(total, pagination!.page, pagination!.limit);
 
       return {
         dates,
         contributors,
-        total: transactions.length
+        total,
+        meta,
       };
     } catch (error) {
       if (error instanceof BadRequestException) {

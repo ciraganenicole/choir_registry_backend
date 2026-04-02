@@ -12,7 +12,6 @@ import {
   UsePipes,
   Query,
   UseGuards,
-  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { User } from './user.entity';
@@ -27,7 +26,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AdminRole } from '../admin/admin-role.enum';
-import * as bcrypt from 'bcrypt';
 
 @ApiTags('Users')
 @Controller()
@@ -184,20 +182,7 @@ export class UsersController {
   @Roles(AdminRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get LEAD users with login information' })
   @ApiResponse({ status: 200, description: 'List of LEAD users with login details' })
-  async getLeadUsersLoginInfo(): Promise<any[]> {
-    const leadUsers = await this.usersService.getLeadUsers();
-    
-    return leadUsers.map(user => ({
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      categories: user.categories,
-      hasPassword: !!user.password,
-      passwordLength: user.password ? user.password.length : 0,
-      isActive: user.isActive,
-      loginReady: user.isActive && !!user.password,
-      generatedPassword: user.password ? `${user.lastName.toLowerCase()}${new Date().getFullYear()}` : null
-    }));
+  async getLeadUsersLoginInfo(): Promise<ReturnType<UsersService['getLeadUsersLoginInfo']>> {
+    return this.usersService.getLeadUsersLoginInfo();
   }
 } 

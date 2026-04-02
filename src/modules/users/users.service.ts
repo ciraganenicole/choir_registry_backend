@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, In, Between } from 'typeorm';
+import { Repository, Like, In, SelectQueryBuilder } from 'typeorm';
 import { User } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -21,27 +21,23 @@ export class UsersService {
         private readonly transactionRepository: Repository<Transaction>
     ) {}
 
-    async getAllUsers(filterDto: UserFilterDto): Promise<[User[], number]> {
-        const { 
-            search, 
-            gender, 
-            maritalStatus, 
-            educationLevel, 
-            profession, 
-            commune, 
-            commission, 
+    private applyUserListFilters(
+        query: SelectQueryBuilder<User>,
+        filterDto: UserFilterDto
+    ): void {
+        const {
+            search,
+            gender,
+            maritalStatus,
+            educationLevel,
+            profession,
+            commune,
+            commission,
             category,
-            isActive, 
-            page = 1, 
-            limit = 8, 
-            sortBy = 'lastName', 
-            order = 'ASC', 
-            letter 
+            isActive,
+            letter,
         } = filterDto;
 
-        const query = this.userRepository.createQueryBuilder('user');
-
-        // Apply filters
         if (search) {
             query.andWhere(
                 '(LOWER(user.firstName) LIKE LOWER(:search) OR LOWER(user.lastName) LIKE LOWER(:search) OR LOWER(user.email) LIKE LOWER(:search) OR LOWER(user.phoneNumber) LIKE LOWER(:search))',
@@ -84,23 +80,43 @@ export class UsersService {
         if (letter) {
             query.andWhere('LOWER(user.firstName) LIKE LOWER(:letter)', { letter: `${letter}%` });
         }
+    }
 
-        // Apply sorting and pagination
-        query.orderBy(`user.${sortBy}`, order)
+    async getAllUsers(filterDto: UserFilterDto): Promise<[User[], number]> {
+        const { page = 1, limit = 8, sortBy = 'lastName', order = 'ASC' } = filterDto;
+
+        const countQb = this.userRepository.createQueryBuilder('user');
+        this.applyUserListFilters(countQb, filterDto);
+        const total = await countQb.getCount();
+
+        const idQb = this.userRepository.createQueryBuilder('user');
+        this.applyUserListFilters(idQb, filterDto);
+        idQb
+            .select('user.id')
+            .orderBy(`user.${sortBy}`, order)
             .skip((page - 1) * limit)
             .take(limit);
 
-        const [users, total] = await query.getManyAndCount();
+        const idRows = await idQb.getMany();
+        const ids = idRows.map((u) => u.id);
 
-        // If we need related data, fetch it separately to avoid join issues
-        if (users.length > 0) {
-            const usersWithRelations = await Promise.all(
-                users.map(async (user) => {
-                    return await this.findById(user.id);
-                })
-            );
-            return [usersWithRelations, total];
+        if (ids.length === 0) {
+            return [[], total];
         }
+
+        const users = await this.userRepository
+            .createQueryBuilder('user')
+            .leftJoinAndSelect('user.attendances', 'attendance')
+            .leftJoinAndSelect('user.transactions', 'transaction')
+            .where('user.id IN (:...ids)', { ids })
+            .orderBy({
+                'attendance.date': 'DESC',
+                'transaction.transactionDate': 'DESC',
+            })
+            .getMany();
+
+        const orderIndex = new Map(ids.map((id, i) => [id, i]));
+        users.sort((a, b) => (orderIndex.get(a.id)! - orderIndex.get(b.id)!));
 
         return [users, total];
     }
@@ -346,69 +362,6 @@ export class UsersService {
             .getMany();
     }
 
-    async findAll(filterDto: UserFilterDto): Promise<[User[], number]> {
-        const { page = 1, limit = 10, search, sortBy = 'lastName', order = 'ASC' } = filterDto;
-        const skip = (page - 1) * limit;
-
-        const queryBuilder = this.userRepository
-            .createQueryBuilder('user')
-            .leftJoinAndSelect('user.attendances', 'attendance')
-            .leftJoinAndSelect('user.transactions', 'transaction');
-
-        if (search) {
-            queryBuilder.andWhere(
-                '(LOWER(user.firstName) LIKE LOWER(:search) OR LOWER(user.lastName) LIKE LOWER(:search) OR LOWER(user.matricule) LIKE LOWER(:search))',
-                { search: `%${search}%` }
-            );
-        }
-
-        if (sortBy) {
-            queryBuilder.orderBy(`user.${sortBy}`, order);
-        }
-
-        queryBuilder
-            .addOrderBy('attendance.date', 'DESC')
-            .addOrderBy('transaction.transactionDate', 'DESC')
-            .skip(skip)
-            .take(limit);
-
-        return queryBuilder.getManyAndCount();
-    }
-
-    async findOne(id: number): Promise<User> {
-        const user = await this.userRepository.findOne({
-            where: { id },
-            relations: ['attendances', 'transactions']
-        });
-
-        if (!user) {
-            throw new NotFoundException(`User with ID ${id} not found`);
-        }
-
-        return user;
-    }
-
-    async findByCategory(category: string): Promise<User[]> {
-        return this.userRepository.createQueryBuilder('user')
-            .where(':category = ANY(user.categories)', { category })
-            .leftJoinAndSelect('user.attendances', 'attendance')
-            .leftJoinAndSelect('user.transactions', 'transaction')
-            .getMany();
-    }
-
-    async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
-        const user = await this.findOne(id);
-        Object.assign(user, updateUserDto);
-        return this.userRepository.save(user);
-    }
-
-    async remove(id: number): Promise<void> {
-        const result = await this.userRepository.delete(id);
-        if (result.affected === 0) {
-            throw new NotFoundException(`User with ID ${id} not found`);
-        }
-    }
-
     // Generate password for LEAD users: lastName + currentYear
     private generatePassword(lastName: string): string {
         const currentYear = new Date().getFullYear();
@@ -509,78 +462,150 @@ export class UsersService {
         return await this.findById(userId);
     }
 
-// Validate user credentials
-async validateUserCredentials(email: string, password: string): Promise<User | null> {
-    const user = await this.findByEmail(email);
-    if (!user || !user.isActive || !user.password) {
-        return null;
+    async validateUserCredentials(email: string, password: string): Promise<User | null> {
+        const user = await this.findByEmail(email);
+        if (!user || !user.isActive || !user.password) {
+            return null;
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        return isPasswordValid ? user : null;
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    return isPasswordValid ? user : null;
-}
+    async getLeadUsers(): Promise<User[]> {
+        return this.userRepository
+            .createQueryBuilder('user')
+            .where('user.categories @> ARRAY[:leadCategory]', { leadCategory: UserCategory.LEAD })
+            .orderBy('user.lastName', 'ASC')
+            .getMany();
+    }
 
-// Get all LEAD users
-async getLeadUsers(): Promise<User[]> {
-    return this.userRepository
-        .createQueryBuilder('user')
-        .where("user.categories @> ARRAY[:leadCategory]", { leadCategory: UserCategory.LEAD })
-        .orderBy('user.lastName', 'ASC')
-        .getMany();
-}
+    async findByEmail(email: string): Promise<User | null> {
+        return this.userRepository.findOne({ where: { email } });
+    }
 
-// Find user by email for authentication
-async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { email } });
-}
+    async getLeadUsersLoginInfo(): Promise<
+        Array<{
+            id: number;
+            firstName: string;
+            lastName: string;
+            email: string | null;
+            categories: UserCategory[];
+            hasPassword: boolean;
+            passwordLength: number;
+            isActive: boolean;
+            loginReady: boolean;
+            generatedPassword: string | null;
+        }>
+    > {
+        const currentYear = new Date().getFullYear();
+        const rows = await this.userRepository
+            .createQueryBuilder('user')
+            .select('user.id', 'id')
+            .addSelect('user.firstName', 'firstName')
+            .addSelect('user.lastName', 'lastName')
+            .addSelect('user.email', 'email')
+            .addSelect('user.categories', 'categories')
+            .addSelect('user.isActive', 'isActive')
+            .addSelect('CASE WHEN user.password IS NOT NULL THEN true ELSE false END', 'hasPassword')
+            .addSelect('COALESCE(LENGTH(user.password), 0)', 'passwordLength')
+            .where('user.categories @> ARRAY[:leadCategory]', { leadCategory: UserCategory.LEAD })
+            .orderBy('user.lastName', 'ASC')
+            .getRawMany();
 
+        return rows.map((row: Record<string, unknown>) => {
+            const lastName = String(row.lastname ?? row.lastName ?? '');
+            const hasPassword = Boolean(row.haspassword ?? row.hasPassword);
+            const passwordLength = Number(row.passwordlength ?? row.passwordLength ?? 0);
+            const categories = (row.categories ?? row.user_categories) as UserCategory[];
+            return {
+                id: Number(row.id ?? row.user_id),
+                firstName: String(row.firstname ?? row.firstName ?? ''),
+                lastName,
+                email: row.email != null ? String(row.email) : null,
+                categories: Array.isArray(categories) ? categories : [],
+                hasPassword,
+                passwordLength,
+                isActive: Boolean(row.isactive ?? row.isActive),
+                loginReady: Boolean(row.isactive ?? row.isActive) && hasPassword,
+                generatedPassword: hasPassword ? `${lastName.toLowerCase()}${currentYear}` : null,
+            };
+        });
+    }
 
+    async getUserContributionStats(
+        userId: number,
+        startDate?: Date,
+        endDate?: Date
+    ): Promise<{
+        totalContributions: number;
+        contributionsByCategory: Record<string, number>;
+        monthlyBreakdown: Record<string, number>;
+        transactionCount: number;
+        dateRange: { from: Date | null; to: Date | null };
+    }> {
+        const toDateStr = (d: Date) => d.toISOString().slice(0, 10);
 
-    async getUserContributionStats(userId: number, startDate?: Date, endDate?: Date): Promise<any> {
-        const queryBuilder = this.transactionRepository
+        const base = this.transactionRepository
             .createQueryBuilder('transaction')
             .where('transaction.contributorId = :userId', { userId })
             .andWhere('transaction.type = :type', { type: TransactionType.INCOME });
 
-        // Add date filtering if dates are provided
         if (startDate) {
-            queryBuilder.andWhere('transaction.transactionDate >= :startDate', { 
-                startDate: new Date(startDate) 
+            base.andWhere('transaction.transactionDate >= :startDate', {
+                startDate: toDateStr(new Date(startDate)),
             });
         }
         if (endDate) {
-            queryBuilder.andWhere('transaction.transactionDate <= :endDate', { 
-                endDate: new Date(endDate) 
+            base.andWhere('transaction.transactionDate <= :endDate', {
+                endDate: toDateStr(new Date(endDate)),
             });
         }
 
-        const transactions = await queryBuilder.getMany();
+        const totalRow = await base
+            .clone()
+            .select('COALESCE(SUM("transaction"."amount"), 0)', 'total')
+            .addSelect('COUNT(*)', 'cnt')
+            .getRawOne();
 
-        const totalContributions = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
-        const contributionsByCategory = transactions.reduce((acc, t) => {
-            acc[t.category] = (acc[t.category] || 0) + Number(t.amount);
-            return acc;
-        }, {} as Record<string, number>);
+        const totalContributions = Number(totalRow?.total ?? 0);
+        const transactionCount = Number(totalRow?.cnt ?? 0);
 
-        // Add monthly breakdown if date range is provided
-        let monthlyBreakdown = {};
+        const categoryRows = await base
+            .clone()
+            .select('transaction.category', 'category')
+            .addSelect('SUM("transaction"."amount")', 'sum')
+            .groupBy('transaction.category')
+            .getRawMany();
+
+        const contributionsByCategory: Record<string, number> = {};
+        for (const row of categoryRows) {
+            contributionsByCategory[String(row.category)] = Number(row.sum);
+        }
+
+        let monthlyBreakdown: Record<string, number> = {};
         if (startDate && endDate) {
-            monthlyBreakdown = transactions.reduce((acc, t) => {
-                const monthYear = t.transactionDate.toString().slice(0, 7); // Format: YYYY-MM
-                acc[monthYear] = (acc[monthYear] || 0) + Number(t.amount);
-                return acc;
-            }, {} as Record<string, number>);
+            const monthlyRows = await base
+                .clone()
+                .select(`TO_CHAR("transaction"."transactionDate", 'YYYY-MM')`, 'month')
+                .addSelect('SUM("transaction"."amount")', 'sum')
+                .groupBy(`TO_CHAR("transaction"."transactionDate", 'YYYY-MM')`)
+                .addOrderBy(`TO_CHAR("transaction"."transactionDate", 'YYYY-MM')`, 'ASC')
+                .getRawMany();
+            for (const row of monthlyRows) {
+                monthlyBreakdown[String(row.month)] = Number(row.sum);
+            }
         }
 
         return {
             totalContributions,
             contributionsByCategory,
             monthlyBreakdown,
-            transactionCount: transactions.length,
+            transactionCount,
             dateRange: {
                 from: startDate ? new Date(startDate) : null,
-                to: endDate ? new Date(endDate) : null
-            }
+                to: endDate ? new Date(endDate) : null,
+            },
         };
     }
 
