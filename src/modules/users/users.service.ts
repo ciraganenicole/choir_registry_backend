@@ -83,42 +83,18 @@ export class UsersService {
     }
 
     async getAllUsers(filterDto: UserFilterDto): Promise<[User[], number]> {
-        const { page = 1, limit = 8, sortBy = 'lastName', order = 'ASC' } = filterDto;
+        const { page = 1, limit = 10, sortBy = 'lastName', order = 'ASC', ...where } = filterDto;
 
-        const countQb = this.userRepository.createQueryBuilder('user');
-        this.applyUserListFilters(countQb, filterDto);
-        const total = await countQb.getCount();
+        const data = await this.userRepository.findAndCount({
+            order: {
+                [sortBy]: order
+            },
+            skip: limit * (page - 1),
+            take: limit,
+            where
+        })
 
-        const idQb = this.userRepository.createQueryBuilder('user');
-        this.applyUserListFilters(idQb, filterDto);
-        idQb
-            .select('user.id')
-            .orderBy(`user.${sortBy}`, order)
-            .skip((page - 1) * limit)
-            .take(limit);
-
-        const idRows = await idQb.getMany();
-        const ids = idRows.map((u) => u.id);
-
-        if (ids.length === 0) {
-            return [[], total];
-        }
-
-        const users = await this.userRepository
-            .createQueryBuilder('user')
-            .leftJoinAndSelect('user.attendances', 'attendance')
-            .leftJoinAndSelect('user.transactions', 'transaction')
-            .where('user.id IN (:...ids)', { ids })
-            .orderBy({
-                'attendance.date': 'DESC',
-                'transaction.transactionDate': 'DESC',
-            })
-            .getMany();
-
-        const orderIndex = new Map(ids.map((id, i) => [id, i]));
-        users.sort((a, b) => (orderIndex.get(a.id)! - orderIndex.get(b.id)!));
-
-        return [users, total];
+        return data;
     }
 
     async findById(id: number): Promise<User> {
