@@ -83,18 +83,17 @@ export class UsersService {
     }
 
     async getAllUsers(filterDto: UserFilterDto): Promise<[User[], number]> {
-        const { page = 1, limit = 10, sortBy = 'lastName', order = 'ASC', ...where } = filterDto;
+        const { page = 1, limit = 10, sortBy = 'lastName', order = 'ASC' } = filterDto;
 
-        const data = await this.userRepository.findAndCount({
-            order: {
-                [sortBy]: order
-            },
-            skip: limit * (page - 1),
-            take: limit,
-            where
-        })
+        const query = this.userRepository.createQueryBuilder('user');
 
-        return data;
+        this.applyUserListFilters(query, filterDto)
+
+        query.orderBy(`"${sortBy}"`, order);
+        query.take(limit);
+        query.skip(limit * (page - 1));
+
+        return query.getManyAndCount();
     }
 
     async findById(id: number): Promise<User> {
