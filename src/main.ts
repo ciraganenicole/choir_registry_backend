@@ -15,7 +15,7 @@ async function bootstrap() {
 
   // Enable CORS for frontend
   app.enableCors({
-    origin: ['http://192.168.1.69:3000', 'https://njc-five.vercel.app'],
+    origin: ['http://192.168.1.69:3000', 'https://njc-five.vercel.app', 'https://choir-salem.vercel.app'],
     methods: ['GET', 'POST', 'PUT','PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: 'Content-Type, Authorization',
     credentials: true,
