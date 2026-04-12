@@ -73,7 +73,7 @@ export class AttendanceController {
         if (!startDate || !endDate) {
             throw new BadRequestException('Start date and end date are required');
         }
-        return this.attendanceService.findByDateRange(startDate.toISOString(), endDate.toISOString());
+        return this.attendanceService.findByDateRange(startDate, endDate);
     }
 
     @Get('unjustified-weekly')
