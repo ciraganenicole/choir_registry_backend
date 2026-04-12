@@ -531,7 +531,7 @@ export class AttendanceService {
         startDate: startDateStr,
         endDate: endDateStr,
       });
-    this.addAttendanceUserPublicSelect(qb);
+
     return qb
       .orderBy('attendance.date', 'DESC')
       .addOrderBy('attendance.timeIn', 'ASC')

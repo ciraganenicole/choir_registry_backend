@@ -9,7 +9,8 @@ import {
     Query, 
     ParseIntPipe,
     UseGuards,
-    Put
+    Put,
+    BadRequestException
 } from '@nestjs/common';
 import { API_ROUTES } from '../../common/routes/api.routes';
 import { AttendanceService } from './attendance.service';
@@ -62,6 +63,17 @@ export class AttendanceController {
         @Query() filterDto: AttendanceFilterDto
     ) {
         return this.attendanceService.findByUser(userId, filterDto);
+    }
+
+    @Get('global/dates')
+    @Roles(AdminRole.ATTENDANCE_ADMIN, AdminRole.SUPER_ADMIN, UserCategory.LEAD)
+    @ApiOperation({ summary: 'Get all dates with attendance records' })
+    @ApiResponse({ status: 200, description: 'All dates with attendance records' })
+    async getGlobalDates(@Query('startDate') startDate: Date, @Query('endDate') endDate: Date) {
+        if (!startDate || !endDate) {
+            throw new BadRequestException('Start date and end date are required');
+        }
+        return this.attendanceService.findByDateRange(startDate.toISOString(), endDate.toISOString());
     }
 
     @Get('unjustified-weekly')
