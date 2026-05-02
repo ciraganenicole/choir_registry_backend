@@ -36,10 +36,6 @@ export class DailyContributionFilterDto {
   @IsBoolean()
   @Type(() => Boolean)
   exportAll?: boolean;
-
-  @IsOptional()
-  @IsString()
-  timeFrame?: 'monthly' | 'quarterly' | 'yearly';
 }
 
 export class DailyContributionSummary {

@@ -10,6 +10,8 @@ import { UserFilterDto } from './dto/user-filter.dto';
 import { Transaction } from '../transactions/transaction.entity';
 import { Attendance } from '../attendance/attendance.entity';
 import { TransactionType } from '../transactions/enums/transactions-categories.enum';
+import { TransactionService } from '../transactions/transaction.service';
+import { TransactionHistoryQueryDto } from '../transactions/dto/transaction-history-query.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -18,7 +20,8 @@ export class UsersService {
         @InjectRepository(User)
         private readonly userRepository: Repository<User>,
         @InjectRepository(Transaction)
-        private readonly transactionRepository: Repository<Transaction>
+        private readonly transactionRepository: Repository<Transaction>,
+        private readonly transactionService: TransactionService,
     ) {}
 
     private applyUserListFilters(
@@ -320,21 +323,8 @@ export class UsersService {
         });
     }
 
-    async getUserTransactions(userId: number, startDate?: Date, endDate?: Date): Promise<Transaction[]> {
-        const queryBuilder = this.transactionRepository
-            .createQueryBuilder('transaction')
-            .where('transaction.contributorId = :userId', { userId });
-
-        if (startDate && endDate) {
-            queryBuilder.andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
-                startDate,
-                endDate
-            });
-        }
-
-        return queryBuilder
-            .orderBy('transaction.transactionDate', 'DESC')
-            .getMany();
+    async getUserTransactions(userId: number, query: TransactionHistoryQueryDto) {
+        return this.transactionService.getTransactionHistory(userId, query);
     }
 
     // Generate password for LEAD users: lastName + currentYear

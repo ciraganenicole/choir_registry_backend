@@ -12,10 +12,12 @@ import {
   IncomeCategories,
 } from './enums/transactions-categories.enum';
 import { DailyContributionFilterDto } from './dto/daily-contribution.dto';
-import { format } from 'date-fns';
+import { TransactionHistoryQueryDto } from './dto/transaction-history-query.dto';
+import { eachDayOfInterval, differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import {
   PaginationMetaDto,
+  MAX_DAILY_DATE_RANGE_DAYS,
   MAX_EXPORT_ROWS,
   buildPaginationMeta,
   resolvePagination,
@@ -657,26 +659,90 @@ export class TransactionService {
     return Array.from(stats.values());
   }
 
-  async getTransactionHistory(userId: number, startDate: string, endDate: string) {
-    // Extract date part from ISO strings
-    const startDateStr = startDate.split('T')[0];
-    const endDateStr = endDate.split('T')[0];
+  /**
+   * Paginated ledger for one contributor. `total` / `meta` count filtered transaction rows.
+   */
+  async getTransactionHistory(
+    userId: number,
+    query: TransactionHistoryQueryDto,
+  ): Promise<{ data: Transaction[]; total: number; meta: PaginationMetaDto }> {
+    const startDateStr = query.startDate.split('T')[0];
+    const endDateStr = query.endDate.split('T')[0];
 
-    return this.transactionRepository
+    const pagination = resolvePagination({
+      page: query.page,
+      limit: query.limit,
+      exportAll: query.exportAll,
+    });
+
+    const countQb = this.transactionRepository
       .createQueryBuilder('transaction')
       .where('transaction.contributorId = :userId', { userId })
       .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
         startDate: startDateStr,
-        endDate: endDateStr
+        endDate: endDateStr,
+      });
+
+    const countRow = await countQb.select('COUNT(transaction.id)', 'cnt').getRawOne();
+    const total = Number(countRow?.cnt ?? 0);
+
+    const dataQb = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.contributor', 'contributor')
+      .where('transaction.contributorId = :userId', { userId })
+      .andWhere('transaction.transactionDate BETWEEN :startDate AND :endDate', {
+        startDate: startDateStr,
+        endDate: endDateStr,
       })
       .orderBy('transaction.transactionDate', 'DESC')
-      .getMany();
+      .addOrderBy('transaction.id', 'DESC');
+
+    if (pagination.mode === 'export') {
+      dataQb.take(pagination.take!);
+    } else {
+      dataQb.skip(pagination.offset).take(pagination.take!);
+    }
+
+    const transactions = await dataQb.getMany();
+
+    transactions.forEach((t) => {
+      t.amount = Number(t.amount) || 0;
+    });
+
+    const meta =
+      pagination.mode === 'export'
+        ? ({
+            page: 1,
+            limit: transactions.length,
+            total,
+            totalPages: 1,
+            hasNextPage: total > transactions.length,
+            hasPreviousPage: false,
+            truncated: total > transactions.length,
+          } satisfies PaginationMetaDto)
+        : buildPaginationMeta(total, pagination.page, pagination.limit);
+
+    return { data: transactions, total, meta };
   }
 
+  /**
+   * @param contributorJoin `false` when `contributor` is already joined on the query builder.
+   */
   private applyDailyContributionsFilters(
     qb: SelectQueryBuilder<Transaction>,
     filters: DailyContributionFilterDto,
+    options?: { contributorJoin?: 'left' | 'inner' | false },
   ): void {
+    const join = options?.contributorJoin;
+
+    if (join !== false) {
+      if (join === 'inner') {
+        qb.innerJoin('transaction.contributor', 'contributor');
+      } else {
+        qb.leftJoin('transaction.contributor', 'contributor');
+      }
+    }
+
     const { startDate, endDate, contributorId, search } = filters;
 
     qb.where('transaction.category = :category', { category: 'DAILY' }).andWhere(
@@ -694,7 +760,7 @@ export class TransactionService {
     }
 
     if (contributorId) {
-      qb.andWhere('contributor.id = :contributorId', { contributorId });
+      qb.andWhere('transaction.contributorId = :contributorId', { contributorId });
     }
 
     if (search) {
@@ -705,53 +771,163 @@ export class TransactionService {
     }
   }
 
+  /**
+   * Daily category income rows without an internal contributor are excluded from the matrix
+   * (only members with contributorId appear as rows). Documented in API.
+   */
+  private assertDailyDateRangeWithinLimit(startDate?: string, endDate?: string): void {
+    if (!startDate || !endDate) {
+      return;
+    }
+    const startStr = startDate.split('T')[0];
+    const endStr = endDate.split('T')[0];
+    const start = parseISO(startStr);
+    const end = parseISO(endStr);
+    if (start > end) {
+      throw new BadRequestException('startDate must be on or before endDate');
+    }
+    const days = differenceInCalendarDays(end, start) + 1;
+    if (days > MAX_DAILY_DATE_RANGE_DAYS) {
+      throw new BadRequestException(
+        `Date range cannot exceed ${MAX_DAILY_DATE_RANGE_DAYS} days (inclusive). Narrow the range or split your request.`,
+      );
+    }
+  }
+
+  private async resolveDailyMatrixDates(filters: DailyContributionFilterDto): Promise<string[]> {
+    if (filters.startDate && filters.endDate) {
+      const startStr = filters.startDate.split('T')[0];
+      const endStr = filters.endDate.split('T')[0];
+      return eachDayOfInterval({
+        start: parseISO(startStr),
+        end: parseISO(endStr),
+      }).map((d) => format(d, 'yyyy-MM-dd'));
+    }
+
+    const qb = this.transactionRepository.createQueryBuilder('transaction');
+    this.applyDailyContributionsFilters(qb, filters, { contributorJoin: 'left' });
+    const row = await qb
+      .select('MIN(transaction.transactionDate)', 'min')
+      .addSelect('MAX(transaction.transactionDate)', 'max')
+      .getRawOne();
+    const min = row?.min;
+    const max = row?.max;
+    if (min == null || max == null) {
+      return [];
+    }
+    const minS = String(min).split('T')[0];
+    const maxS = String(max).split('T')[0];
+    return eachDayOfInterval({
+      start: parseISO(minS),
+      end: parseISO(maxS),
+    }).map((d) => format(d, 'yyyy-MM-dd'));
+  }
+
+  private async fetchDistinctContributorIdsForDailyPage(
+    filters: DailyContributionFilterDto,
+    pagination: { offset: number; take: number } | null,
+  ): Promise<number[]> {
+    const qb = this.transactionRepository.createQueryBuilder('transaction');
+    this.applyDailyContributionsFilters(qb, filters, { contributorJoin: 'inner' });
+
+    qb
+      .select('contributor.id', 'id')
+      .groupBy('contributor.id')
+      .addGroupBy('contributor.firstName')
+      .addGroupBy('contributor.lastName')
+      .orderBy('contributor.firstName', 'ASC')
+      .addOrderBy('contributor.lastName', 'ASC');
+
+    if (pagination) {
+      qb.offset(pagination.offset).limit(pagination.take);
+    }
+
+    const rows = await qb.getRawMany();
+    return rows.map((r) => Number(r.id));
+  }
+
+  private async fetchDailyTransactionsForContributors(
+    filters: DailyContributionFilterDto,
+    contributorIds: number[],
+  ): Promise<Transaction[]> {
+    if (contributorIds.length === 0) {
+      return [];
+    }
+
+    const qb = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.contributor', 'contributor')
+      .where('transaction.contributorId IN (:...contributorIds)', { contributorIds });
+
+    this.applyDailyContributionsFilters(qb, filters, { contributorJoin: false });
+
+    return qb.orderBy('transaction.transactionDate', 'ASC').addOrderBy('transaction.id', 'ASC').getMany();
+  }
+
+  /**
+   * Matrix response: `dates` covers the full filtered calendar interval; pagination applies to
+   * contributor rows only (`meta.total` = contributors matching the filter, not transaction rows).
+   */
   async getDailyContributions(filters: DailyContributionFilterDto) {
     try {
+      this.assertDailyDateRangeWithinLimit(filters.startDate, filters.endDate);
+
       const fullExport = Boolean(filters.exportAll);
       const pagination = fullExport
         ? null
         : resolvePagination({ page: filters.page, limit: filters.limit });
 
-      const countQb = this.transactionRepository
-        .createQueryBuilder('transaction')
-        .leftJoin('transaction.contributor', 'contributor');
-      this.applyDailyContributionsFilters(countQb, filters);
-      const countRow = await countQb
-        .select('COUNT(DISTINCT transaction.id)', 'cnt')
+      const dates = await this.resolveDailyMatrixDates(filters);
+
+      const countContributorsQb = this.transactionRepository.createQueryBuilder('transaction');
+      this.applyDailyContributionsFilters(countContributorsQb, filters, { contributorJoin: 'inner' });
+
+      const contributorCountRow = await countContributorsQb
+        .select('COUNT(DISTINCT contributor.id)', 'cnt')
         .getRawOne();
-      const total = Number(countRow?.cnt ?? 0);
+      const totalContributors = Number(contributorCountRow?.cnt ?? 0);
 
-      const query = this.transactionRepository
-        .createQueryBuilder('transaction')
-        .leftJoinAndSelect('transaction.contributor', 'contributor');
-      this.applyDailyContributionsFilters(query, filters);
-
-      if (pagination) {
-        query.skip(pagination.offset).take(pagination.take!);
-      } else if (fullExport) {
-        query.take(MAX_EXPORT_ROWS);
+      if (fullExport) {
+        const txCountQb = this.transactionRepository.createQueryBuilder('transaction');
+        this.applyDailyContributionsFilters(txCountQb, filters, { contributorJoin: 'left' });
+        const txCountRow = await txCountQb.select('COUNT(transaction.id)', 'cnt').getRawOne();
+        const totalTransactions = Number(txCountRow?.cnt ?? 0);
+        if (totalTransactions > MAX_EXPORT_ROWS) {
+          throw new BadRequestException(
+            `Too many transaction rows (${totalTransactions}) for export. Maximum is ${MAX_EXPORT_ROWS}. Narrow the date range or use paginated requests without exportAll.`,
+          );
+        }
       }
 
-      const transactions = await query
-        .orderBy('transaction.transactionDate', 'ASC')
-        .getMany();
+      const contributorIds = await this.fetchDistinctContributorIdsForDailyPage(
+        filters,
+        fullExport || !pagination
+          ? null
+          : { offset: pagination.offset, take: pagination.take ?? pagination.limit },
+      );
 
-      // Get unique dates
-      const dates = [...new Set(transactions.map(t => {
-        const date = new Date(t.transactionDate);
-        return date.toISOString().split('T')[0];
-      }))].sort();
+      const transactions = await this.fetchDailyTransactionsForContributors(filters, contributorIds);
 
-      // Group by contributor
-      const contributorsMap = new Map();
+      const contributorsMap = new Map<
+        number,
+        {
+          userId: number;
+          firstName: string;
+          lastName: string;
+          totalAmount: number;
+          contributions: Array<{ date: string; amount: number; currency: Currency }>;
+        }
+      >();
 
-      transactions.forEach(transaction => {
-        if (!transaction.contributor) return;
+      for (const transaction of transactions) {
+        if (!transaction.contributor) {
+          continue;
+        }
 
-        const contributorId = transaction.contributor.id;
-        if (!contributorsMap.has(contributorId)) {
-          contributorsMap.set(contributorId, {
-            userId: contributorId,
+        const cid = transaction.contributor.id;
+        if (!contributorsMap.has(cid)) {
+          contributorsMap.set(cid, {
+            userId: cid,
             firstName: transaction.contributor.firstName || '',
             lastName: transaction.contributor.lastName || '',
             totalAmount: 0,
@@ -759,17 +935,20 @@ export class TransactionService {
           });
         }
 
-        const contributor = contributorsMap.get(contributorId);
+        const row = contributorsMap.get(cid)!;
         const amount = Number(transaction.amount) || 0;
-        contributor.totalAmount += amount;
-        contributor.contributions.push({
-          date: new Date(transaction.transactionDate).toISOString().split('T')[0],
-          amount: amount,
-          currency: transaction.currency
+        row.totalAmount += amount;
+        const dateStr =
+          typeof transaction.transactionDate === 'string'
+            ? transaction.transactionDate.split('T')[0]
+            : format(new Date(transaction.transactionDate), 'yyyy-MM-dd');
+        row.contributions.push({
+          date: dateStr,
+          amount,
+          currency: transaction.currency,
         });
-      });
+      }
 
-      // Sort contributors by name
       const contributors = Array.from(contributorsMap.values()).sort((a, b) =>
         (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName),
       );
@@ -777,19 +956,20 @@ export class TransactionService {
       const meta: PaginationMetaDto = fullExport
         ? {
             page: 1,
-            limit: transactions.length,
-            total,
+            limit: contributors.length,
+            total: totalContributors,
             totalPages: 1,
-            hasNextPage: total > transactions.length,
+            hasNextPage: false,
             hasPreviousPage: false,
-            truncated: total > transactions.length,
+            truncated: false,
           }
-        : buildPaginationMeta(total, pagination!.page, pagination!.limit);
+        : buildPaginationMeta(totalContributors, pagination!.page, pagination!.limit);
 
       return {
         dates,
         contributors,
-        total,
+        /** Number of contributors matching the filter (same as meta.total). */
+        total: totalContributors,
         meta,
       };
     } catch (error) {

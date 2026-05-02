@@ -1,3 +1,5 @@
+import { differenceInCalendarDays } from 'date-fns';
+
 /**
  * Standard pagination metadata for list endpoints (DB still uses LIMIT/OFFSET; we do not load full tables in memory).
  */
@@ -20,9 +22,33 @@ export type PaginationInput = {
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
-const MAX_PAGE_SIZE = 100;
+/** Server-side ceiling for `limit` on ledger-style endpoints. */
+export const MAX_PAGE_SIZE = 100;
 /** When exportAll=true, cap rows to protect the database and Node heap. */
 export const MAX_EXPORT_ROWS = 25_000;
+
+function isGregorianLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+function nextGregorianLeapYearOnOrAfter(year: number): number {
+  for (let y = year; y < year + 8; y++) {
+    if (isGregorianLeapYear(y)) {
+      return y;
+    }
+  }
+  return year + 4;
+}
+
+/**
+ * Longest inclusive Jan 1 → Dec 31 span in days (occurs in a leap year). Derived from calendar math.
+ */
+export const MAX_DAILY_DATE_RANGE_DAYS = (() => {
+  const y = nextGregorianLeapYearOnOrAfter(new Date().getUTCFullYear());
+  const jan1Utc = new Date(Date.UTC(y, 0, 1));
+  const dec31Utc = new Date(Date.UTC(y, 11, 31));
+  return differenceInCalendarDays(dec31Utc, jan1Utc) + 1;
+})();
 
 export function resolvePagination(input: PaginationInput): {
   page: number;
