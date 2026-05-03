@@ -4,10 +4,12 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { User } from './user.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { TransactionModule } from '../transactions/transaction.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Transaction])
+    TypeOrmModule.forFeature([User, Transaction]),
+    TransactionModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],
