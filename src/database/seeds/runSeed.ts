@@ -4,6 +4,7 @@ import { TransactionSeeder } from './transaction.seed';
 import { seedAttendance } from './attendance.seed';
 import { DataSource } from 'typeorm';
 import { seedUsers } from './users.seed';
+import { seedContent } from './content.seed';
 
 const runSeed = async () => {
   try {
@@ -15,7 +16,16 @@ const runSeed = async () => {
     console.log('🔄 Running migrations...');
     await AppDataSource.runMigrations();
     console.log('✅ Migrations completed');
-    await seedAttendance(AppDataSource);
+
+    // // Run all seeders
+    // await seedUsers(AppDataSource);
+    // console.log('✅ Users seeded');
+    
+    // await seedAttendance(AppDataSource);
+    // console.log('✅ Attendance seeded');
+
+    await seedContent(AppDataSource);
+    console.log('✅ Content seeded');
 
   } catch (error) {
     console.error('❌ Error during seeding:', error);
@@ -33,6 +43,7 @@ export const runSeedWithDataSource = async (dataSource: DataSource): Promise<voi
         // Run seeders in sequence
         await seedUsers(dataSource);
         await seedAttendance(dataSource);
+        await seedContent(dataSource);
         
         console.log('All seeders completed successfully');
     } catch (error) {

@@ -29,7 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
                 const correspondingUser = await this.usersService.findByEmail(adminUser.email);
                 return {
                     id: correspondingUser?.id || payload.sub, // Use user ID if exists, fallback to admin ID
-                    email: payload.email,
+                    email: payload.email ?? adminUser.email,
                     role: payload.role,
                     username: payload.username,
                     type: 'admin',

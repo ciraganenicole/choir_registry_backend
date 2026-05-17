@@ -9,6 +9,7 @@ import { Commission } from './enums/commission.enum';
 import { UserCategory } from './enums/user-category.enum';
 import { Attendance } from '../attendance/attendance.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { UserRoleAssignment } from './user-role-assignment.entity';
 
 //Nullable values except firstname & lastname
 
@@ -167,6 +168,9 @@ export class User {
 
     @OneToMany(() => Attendance, attendance => attendance.user)
     attendances: Attendance[];
+
+    @OneToMany(() => UserRoleAssignment, (assignment) => assignment.user)
+    roleAssignments: UserRoleAssignment[];
 
     @AfterInsert()
     async generateMatricule(manager?: EntityManager) {

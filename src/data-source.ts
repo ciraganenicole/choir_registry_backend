@@ -16,6 +16,13 @@ import { RehearsalSongMusician } from './modules/rehearsal/rehearsal-song-musici
 import { RehearsalVoicePart } from './modules/rehearsal/rehearsal-voice-part.entity';
 import { Communique } from './modules/communiques/communique.entity';
 import { Report } from './modules/reports/report.entity';
+import { Department } from './modules/users/department.entity';
+import { Permission } from './modules/users/permission.entity';
+import { Role } from './modules/users/role.entity';
+import { UserRoleAssignment } from './modules/users/user-role-assignment.entity';
+import { ContentType } from './modules/content/content-type.entity';
+import { ContentFieldDefinition } from './modules/content/content-field-definition.entity';
+import { Content } from './modules/content/content.entity';
 
 config();
 
@@ -52,7 +59,14 @@ export const AppDataSource = new DataSource({
     RehearsalSongMusician,
     RehearsalVoicePart,
     Communique,
-    Report
+    Report,
+    Department,
+    Permission,
+    Role,
+    UserRoleAssignment,
+    ContentType,
+    ContentFieldDefinition,
+    Content,
   ],
   migrations: ['src/database/migrations/*.ts'],
   subscribers: [],

@@ -32,4 +32,22 @@ export class CreateSongDto {
   @IsOptional()
   @IsDateString()
   last_performed?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  audioUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  duration?: string;
+
+  @IsOptional()
+  @IsInt()
+  departmentId?: number;
+
+  @IsOptional()
+  @IsInt()
+  albumId?: number;
 } 

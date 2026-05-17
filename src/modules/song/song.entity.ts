@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { User } from '../users/user.entity';
+import { Department } from '../users/department.entity';
 
 export enum SongDifficulty {
   EASY = 'Easy',
@@ -43,6 +44,22 @@ export class Song {
 
   @Column('text')
   lyrics: string;
+
+  @Column({ type: 'text', nullable: true })
+  audioUrl: string | null;
+
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  duration: string | null;
+
+  @ManyToOne(() => Department, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'departmentId' })
+  department?: Department | null;
+
+  @Column({ type: 'int', nullable: true })
+  departmentId: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  albumId: number | null;
 
   @Column({ default: 0 })
   times_performed: number;

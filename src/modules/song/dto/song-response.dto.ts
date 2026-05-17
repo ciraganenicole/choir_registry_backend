@@ -23,6 +23,10 @@ export class SongResponseDto {
   lastPerformance?: string;
   added_by?: UserResponseDto;
   addedById?: number | null;
+  audioUrl?: string | null;
+  duration?: string | null;
+  departmentId?: number | null;
+  albumId?: number | null;
   createdAt?: string;
   updatedAt?: string;
 
@@ -46,6 +50,10 @@ export class SongResponseDto {
         matricule: song.added_by.matricule,
       } : undefined,
       addedById: song.addedById,
+      audioUrl: song.audioUrl ?? null,
+      duration: song.duration ?? null,
+      departmentId: song.departmentId ?? null,
+      albumId: song.albumId ?? null,
       createdAt: song.created_at?.toISOString(),
       updatedAt: song.updated_at?.toISOString(),
     };

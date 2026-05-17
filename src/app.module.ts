@@ -16,6 +16,7 @@ import { UploadModule } from './modules/upload/upload.module';
 import { CommuniqueModule } from './modules/communiques/communique.module';
 import { ReportModule } from './modules/reports/report.module';
 import { LouadoShiftModule } from './modules/louado-shift/louado-shift.module';
+import { ContentModule } from './modules/content/content.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { LouadoShiftModule } from './modules/louado-shift/louado-shift.module';
     CommuniqueModule,
     ReportModule,
     LouadoShiftModule,
+    ContentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

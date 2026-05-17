@@ -38,4 +38,22 @@ export class UpdateSongDto {
   @IsOptional()
   @IsDateString()
   last_performed?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  audioUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  duration?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  departmentId?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  albumId?: number | null;
 } 
