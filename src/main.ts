@@ -22,6 +22,7 @@ async function bootstrap() {
       'http://localhost:3000',
       'http://localhost:8080',
       'http://127.0.0.1:8080',
+      'https://5-eme-celpa-salem.vercel.app'
     ],
     methods: ['GET', 'POST', 'PUT','PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: 'Content-Type, Authorization',
