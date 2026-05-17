@@ -4,6 +4,7 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { User } from './user.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { TransactionModule } from '../transactions/transaction.module';
 import { Department } from './department.entity';
 import { Permission } from './permission.entity';
 import { Role } from './role.entity';
@@ -21,6 +22,7 @@ import { DepartmentsController } from './departments.controller';
       Role,
       UserRoleAssignment,
     ]),
+    TransactionModule,
   ],
   controllers: [UsersController, DepartmentsController],
   providers: [UsersService, RbacService],

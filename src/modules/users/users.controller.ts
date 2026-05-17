@@ -14,6 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { TransactionHistoryQueryDto } from '../transactions/dto/transaction-history-query.dto';
 import { User } from './user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -116,17 +117,18 @@ export class UsersController {
 
   @Get(API_ROUTES.USERS.TRANSACTIONS)
   @Roles(AdminRole.SUPER_ADMIN, AdminRole.ATTENDANCE_ADMIN, AdminRole.FINANCE_ADMIN, UserCategory.LEAD)
-  @ApiOperation({ summary: 'Get user transactions' })
-  @ApiResponse({ status: 200, description: 'User transactions' })
+  @ApiOperation({
+    summary: 'Get user transactions (ledger)',
+    description:
+      'Paginated list of transactions for the user in [startDate, endDate] (inclusive YYYY-MM-DD). `total` and `meta` count filtered rows; see Transactions tag for limits.',
+  })
+  @ApiResponse({ status: 200, description: 'Paginated transactions with meta' })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserTransactions(
     @Param('id', ParseIntPipe) id: number,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: Date,
-  ): Promise<Transaction[]> {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
-    return this.usersService.getUserTransactions(id, start, end);
+    @Query(new ValidationPipe({ transform: true })) query: TransactionHistoryQueryDto,
+  ) {
+    return this.usersService.getUserTransactions(id, query);
   }
 
   @Get(':id/contribution-stats')

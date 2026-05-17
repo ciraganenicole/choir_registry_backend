@@ -6,6 +6,10 @@ export const swaggerConfig = new DocumentBuilder()
     .setVersion('1.0')
     .addBearerAuth()
     .addTag('Auth', 'Authentication endpoints')
+    .addTag(
+      'Transactions',
+      'Finance transactions: ledger lists, aggregates, daily matrix (see each route for pagination vs full-range semantics)',
+    )
     .addTag('Users', 'User management endpoints')
     .addTag('Attendance', 'Attendance management endpoints')
     .addTag('Leave', 'Leave management endpoints')
