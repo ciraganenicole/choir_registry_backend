@@ -28,6 +28,10 @@ import {
   ListContentQueryDto,
   UpdateContentDto,
 } from './dto/content-instance.dto';
+import {
+  SLUG_SOURCE_FIELD_BY_TYPE_CODE,
+  slugify,
+} from './content-slug.util';
 import { Department } from '../users/department.entity';
 import { User } from '../users/user.entity';
 import { UsersService } from '../users/users.service';
@@ -276,7 +280,44 @@ export class ContentService {
           throw bad();
         }
         break;
-      case ContentFieldType.RELATION:
+      case ContentFieldType.RELATION: {
+        const storeAs = this.relationStoreAs(validation);
+        const multiple =
+          validation &&
+          typeof validation === 'object' &&
+          validation['multiple'] === true;
+        if (storeAs === 'slug') {
+          if (multiple) {
+            if (
+              !Array.isArray(v) ||
+              !v.every((x) => typeof x === 'string' && x.trim())
+            ) {
+              throw bad();
+            }
+          } else if (typeof v !== 'string' || !v.trim()) {
+            throw bad();
+          }
+        } else if (multiple) {
+          if (
+            !Array.isArray(v) ||
+            !v.every(
+              (x) =>
+                typeof x === 'number' &&
+                Number.isFinite(x) &&
+                Number.isInteger(x),
+            )
+          ) {
+            throw bad();
+          }
+        } else if (
+          typeof v !== 'number' ||
+          !Number.isFinite(v) ||
+          !Number.isInteger(v)
+        ) {
+          throw bad();
+        }
+        break;
+      }
       case ContentFieldType.ENTITY_RELATION: {
         const multiple =
           validation &&
@@ -358,9 +399,126 @@ export class ContentService {
         }
         break;
       }
+      case ContentFieldType.SOCIAL_LINK_LIST: {
+        if (!Array.isArray(v)) throw bad();
+        for (const item of v) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            throw bad();
+          }
+          const o = item as Record<string, unknown>;
+          if (typeof o.label !== 'string') throw bad();
+          if (typeof o.url !== 'string') throw bad();
+        }
+        break;
+      }
+      case ContentFieldType.SEO_DEFAULTS: {
+        if (!v || typeof v !== 'object' || Array.isArray(v)) throw bad();
+        const o = v as Record<string, unknown>;
+        if (typeof o.title !== 'string') throw bad();
+        if (typeof o.description !== 'string') throw bad();
+        if (typeof o.ogImage !== 'string') throw bad();
+        if (
+          o.keywords !== undefined &&
+          o.keywords !== null &&
+          typeof o.keywords !== 'string'
+        ) {
+          throw bad();
+        }
+        break;
+      }
+      case ContentFieldType.PROGRAM_LIST: {
+        if (!Array.isArray(v)) throw bad();
+        for (const item of v) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            throw bad();
+          }
+          const o = item as Record<string, unknown>;
+          if (typeof o.timeRange !== 'string') throw bad();
+          if (typeof o.title !== 'string') throw bad();
+          if (
+            o.description !== undefined &&
+            o.description !== null &&
+            typeof o.description !== 'string'
+          ) {
+            throw bad();
+          }
+        }
+        break;
+      }
+      case ContentFieldType.WEEKLY_PROGRAM_LIST: {
+        if (!Array.isArray(v)) throw bad();
+        for (const item of v) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            throw bad();
+          }
+          const o = item as Record<string, unknown>;
+          if (typeof o.title !== 'string' || !o.title.trim()) throw bad();
+          if (typeof o.day !== 'string' || !o.day.trim()) throw bad();
+          if (typeof o.time !== 'string' || !o.time.trim()) throw bad();
+          if (typeof o.description !== 'string' || !o.description.trim()) {
+            throw bad();
+          }
+        }
+        break;
+      }
+      case ContentFieldType.MODERATOR_LIST: {
+        if (!Array.isArray(v)) throw bad();
+        for (const item of v) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            throw bad();
+          }
+          const o = item as Record<string, unknown>;
+          if (typeof o.name !== 'string') throw bad();
+          if (typeof o.roleTitle !== 'string') throw bad();
+          if (
+            o.bio !== undefined &&
+            o.bio !== null &&
+            typeof o.bio !== 'string'
+          ) {
+            throw bad();
+          }
+          if (
+            o.imageUrl !== undefined &&
+            o.imageUrl !== null &&
+            typeof o.imageUrl !== 'string'
+          ) {
+            throw bad();
+          }
+        }
+        break;
+      }
+      case ContentFieldType.STRING_LIST: {
+        if (!Array.isArray(v)) throw bad();
+        for (const item of v) {
+          if (typeof item !== 'string') throw bad();
+        }
+        break;
+      }
       default:
         throw new BadRequestException(`Unsupported field type: ${fieldType}`);
     }
+  }
+
+  private relationStoreAs(
+    validation: Record<string, unknown> | null,
+  ): 'id' | 'linkedEntityId' | 'slug' {
+    const raw = validation?.['storeAs'];
+    if (raw === 'linkedEntityId') return 'linkedEntityId';
+    if (raw === 'slug') return 'slug';
+    return 'id';
+  }
+
+  private applyAutoSlug(
+    typeCode: string,
+    fieldValues: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const sourceKey = SLUG_SOURCE_FIELD_BY_TYPE_CODE[typeCode];
+    if (!sourceKey) return fieldValues;
+    const raw = fieldValues[sourceKey];
+    if (typeof raw !== 'string' || !raw.trim()) return fieldValues;
+    const slug = slugify(raw);
+    if (!slug) return fieldValues;
+    return { ...fieldValues, slug };
   }
 
   private async validateRelationTargets(
@@ -385,18 +543,41 @@ export class ContentService {
       if (!targetType) {
         throw new BadRequestException(`Unknown content type code: ${code}`);
       }
+      const storeAs = this.relationStoreAs(def.validation);
+
+      if (storeAs === 'slug') {
+        const slugs = Array.isArray(v) ? v : [v];
+        for (const slug of slugs) {
+          if (typeof slug !== 'string' || !slug.trim()) continue;
+          const count = await this.contentRepo
+            .createQueryBuilder('c')
+            .where('c.contentTypeId = :tid', { tid: targetType.id })
+            .andWhere(`c."fieldValues"->>'slug' = :slug`, {
+              slug: slug.trim(),
+            })
+            .getCount();
+          if (count < 1) {
+            throw new BadRequestException(
+              `Referenced slug "${slug.trim()}" not found for type "${code}"`,
+            );
+          }
+        }
+        continue;
+      }
+
       const ids = Array.isArray(v) ? v : [v];
       for (const id of ids) {
         if (typeof id !== 'number' || !Number.isInteger(id)) continue;
-        const count = await this.contentRepo.count({
-          where: {
-            id,
-            contentType: { id: targetType.id },
-          },
-        });
+        const where =
+          storeAs === 'linkedEntityId'
+            ? { linkedEntityId: id, contentType: { id: targetType.id } }
+            : { id, contentType: { id: targetType.id } };
+        const count = await this.contentRepo.count({ where });
         if (count < 1) {
           throw new BadRequestException(
-            `Referenced content id ${id} not found for type "${code}"`,
+            storeAs === 'linkedEntityId'
+              ? `Referenced linkedEntityId ${id} not found for type "${code}"`
+              : `Referenced content id ${id} not found for type "${code}"`,
           );
         }
       }
@@ -595,7 +776,8 @@ export class ContentService {
       throw new ForbiddenException('Cannot create content for this audience');
     }
 
-    const cleaned = this.validateFieldValues(fields, dto.fieldValues, true);
+    let cleaned = this.validateFieldValues(fields, dto.fieldValues, true);
+    cleaned = this.applyAutoSlug(type.code, cleaned);
     await this.validateFieldRelations(fields, cleaned);
 
     const authorId = await this.resolveChoirUserIdForFk(principal);
@@ -635,7 +817,8 @@ export class ContentService {
 
     if (dto.fieldValues !== undefined) {
       const merged = { ...row.fieldValues, ...dto.fieldValues };
-      const cleaned = this.validateFieldValues(fields, merged, true);
+      let cleaned = this.validateFieldValues(fields, merged, true);
+      cleaned = this.applyAutoSlug(row.contentType.code, cleaned);
       await this.validateFieldRelations(fields, cleaned);
       row.fieldValues = cleaned;
     }
@@ -649,7 +832,7 @@ export class ContentService {
       row.audienceDepartment = next ? ({ id: next } as Department) : null;
     }
 
-    if (dto.status !== undefined) {
+    if (dto.status !== undefined && dto.status !== row.status) {
       this.assertStatusTransition(row.status, dto.status);
       if (dto.status === ContentStatus.PUBLISHED) {
         throw new ForbiddenException('Use publish endpoint to set published');

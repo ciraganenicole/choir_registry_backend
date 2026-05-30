@@ -75,6 +75,20 @@ export class PublicContentService {
     return `${s.slice(0, max)}…`;
   }
 
+  private resolveBodyHtml(fv: Record<string, unknown>): string {
+    if (typeof fv['bodyHtml'] === 'string') {
+      return fv['bodyHtml'];
+    }
+    const legacy = fv['bodyParagraphs'];
+    if (Array.isArray(legacy)) {
+      return legacy
+        .filter((p): p is string => typeof p === 'string')
+        .map((p) => `<p>${p}</p>`)
+        .join('');
+    }
+    return '';
+  }
+
   mapEventFull(c: Content) {
     const fv = c.fieldValues ?? {};
     return {
@@ -89,7 +103,7 @@ export class PublicContentService {
       mapEmbedUrl: fv['mapEmbedUrl'] ?? '',
       image: fv['image'],
       summary: fv['summary'],
-      bodyParagraphs: fv['bodyParagraphs'] ?? [],
+      bodyHtml: this.resolveBodyHtml(fv),
       program: fv['program'] ?? [],
       moderators: fv['moderators'] ?? [],
     };
@@ -275,9 +289,35 @@ export class PublicContentService {
       gallery: fv['gallery'] ?? [],
       songs: null as PublicSongDto[] | null,
       videos: null as PublicVideoDto[] | null,
-      subDepartmentSlugs: fv['subDepartmentSlugs'] ?? [],
+      subDepartmentSlugs: [] as string[],
       eventSlugs: fv['eventSlugs'] ?? [],
     };
+  }
+
+  private async resolveSubDepartmentSlugs(
+    parentLinkedEntityId: number,
+    departmentTypeId: number,
+  ): Promise<string[]> {
+    const rows = await this.contentRepo
+      .createQueryBuilder('c')
+      .select(['c.fieldValues'])
+      .where('c.contentTypeId = :tid', { tid: departmentTypeId })
+      .andWhere('c.linkedEntityType = :lt', { lt: 'DepartmentPage' })
+      .andWhere('c.status = :st', { st: ContentStatus.PUBLISHED })
+      .andWhere('c.visibility = :vi', { vi: ContentVisibility.PUBLIC })
+      .andWhere(
+        `(c."fieldValues"->>'parentDepartmentId')::int = :pid`,
+        { pid: parentLinkedEntityId },
+      )
+      .orderBy(`c."fieldValues"->>'name'`, 'ASC')
+      .getMany();
+
+    return rows
+      .map((r) => {
+        const slug = r.fieldValues?.['slug'];
+        return typeof slug === 'string' && slug.trim() ? slug.trim() : null;
+      })
+      .filter((s): s is string => Boolean(s));
   }
 
   mapDepartmentSlim(c: Content) {
@@ -377,8 +417,13 @@ export class PublicContentService {
     const fv = row.fieldValues ?? {};
     const songs = await this.resolveDepartmentSongs(fv);
     const videos = this.normalizeVideoList(fv['videos']);
+    const subDepartmentSlugs = await this.resolveSubDepartmentSlugs(
+      row.linkedEntityId,
+      type.id,
+    );
     return {
       ...base,
+      subDepartmentSlugs,
       songs,
       videos: videos.length > 0 ? videos : null,
     };
@@ -409,6 +454,14 @@ export class PublicContentService {
       contactPhone: fv['contactPhone'],
       socialLinks: fv['socialLinks'] ?? [],
       heroImage: fv['heroImage'],
+      programsHeadline: fv['programsHeadline'] ?? '',
+      programsIntro: fv['programsIntro'] ?? '',
+      weeklyPrograms: fv['weeklyPrograms'] ?? [],
+      contactHeadline: fv['contactHeadline'] ?? '',
+      contactIntro: fv['contactIntro'] ?? '',
+      mapEmbedUrl: fv['mapEmbedUrl'] ?? '',
+      homeCellsIntro: fv['homeCellsIntro'] ?? '',
+      homeCells: fv['homeCells'] ?? [],
       seoDefaults: fv['seoDefaults'] ?? {},
     };
   }

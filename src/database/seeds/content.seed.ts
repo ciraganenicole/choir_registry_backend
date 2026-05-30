@@ -11,6 +11,10 @@ import {
   SongStatus,
 } from '../../modules/song/song.entity';
 
+function paragraphsToHtml(paragraphs: string[]): string {
+  return paragraphs.map((p) => `<p>${p}</p>`).join('');
+}
+
 type InlineSeedSong = {
   id: string;
   title: string;
@@ -183,7 +187,6 @@ const departmentsData = [
       { id: 'vid-1', title: 'Culte du Dimanche - Chœur', source: 'youtube', videoId: 'dQw4w9WgXcQ', thumbnail: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80', publishedAt: '2026-04-27T10:00:00Z' },
       { id: 'vid-2', title: 'Concert de Louange 2026', source: 'youtube', videoId: 'dQw4w9WgXcQ', thumbnail: 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=400&q=80', publishedAt: '2026-04-20T19:00:00Z' },
     ],
-    subDepartmentSlugs: ['chorale-jeunes', 'chorale-enfants'],
     eventSlugs: ['concert-de-louange-2026'],
   },
   {
@@ -205,7 +208,6 @@ const departmentsData = [
     videos: [
       { id: 'vid-2-1', title: 'Journée Jeunesse 2025', source: 'youtube', videoId: 'dQw4w9WgXcQ', thumbnail: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&q=80', publishedAt: '2025-11-08T10:00:00Z' },
     ],
-    subDepartmentSlugs: ['groupe-ados', 'groupe-jeunes-adultes'],
     eventSlugs: ['journee-jeunesse-2025'],
   },
   {
@@ -227,7 +229,6 @@ const departmentsData = [
       { id: 'vid-3-1', title: 'Semaine de Prière 2026', source: 'youtube', videoId: 'dQw4w9WgXcQ', thumbnail: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=400&q=80', publishedAt: '2026-03-10T18:00:00Z' },
       { id: 'vid-3-2', title: 'Veillée de Fin d\'Année', source: 'youtube', videoId: 'dQw4w9WgXcQ', thumbnail: 'https://images.unsplash.com/photo-1478147427282-58a87a120781?w=400&q=80', publishedAt: '2025-12-15T21:00:00Z' },
     ],
-    subDepartmentSlugs: [],
     eventSlugs: ['semaine-de-priere-2026', 'veillee-de-priere-2025'],
   },
   {
@@ -252,7 +253,6 @@ const departmentsData = [
       { id: 'vid-j1', title: 'Jeunesse pour Christ', source: 'youtube', videoId: 'dQw4w9WgXcQ', thumbnail: 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=400&q=80', publishedAt: '2026-03-15T10:00:00Z' },
       { id: 'vid-j2', title: 'Rayonnons', source: 'youtube', videoId: 'dQw4w9WgXcQ', thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80', publishedAt: '2026-03-01T10:00:00Z' },
     ],
-    subDepartmentSlugs: [],
     eventSlugs: ['concert-de-louange-2026'],
   },
   {
@@ -273,7 +273,6 @@ const departmentsData = [
       { id: 'song-e2', title: 'Louez avec Joie', artist: 'Chorale Enfants', audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3', duration: '3:10' },
     ],
     videos: [],
-    subDepartmentSlugs: [],
     eventSlugs: [],
   },
   {
@@ -291,7 +290,6 @@ const departmentsData = [
     ],
     songs: [],
     videos: [],
-    subDepartmentSlugs: [],
     eventSlugs: ['journee-jeunesse-2025'],
   },
   {
@@ -309,7 +307,6 @@ const departmentsData = [
     ],
     songs: [],
     videos: [],
-    subDepartmentSlugs: [],
     eventSlugs: ['journee-jeunesse-2025'],
   },
 ];
@@ -325,48 +322,51 @@ type FieldSeedDef = {
 
 const churchEventFieldDefinitions = [
   { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Title', required: true, sortOrder: 1 },
-  { fieldKey: 'slug', fieldType: ContentFieldType.TEXT, label: 'Slug', required: true, sortOrder: 2 },
-  { fieldKey: 'dateLabel', fieldType: ContentFieldType.TEXT, label: 'Date Label', required: true, sortOrder: 3 },
-  { fieldKey: 'startDate', fieldType: ContentFieldType.DATE, label: 'Start Date', required: true, sortOrder: 4 },
-  { fieldKey: 'endDate', fieldType: ContentFieldType.DATE, label: 'End Date', required: false, sortOrder: 5 },
-  { fieldKey: 'locationShort', fieldType: ContentFieldType.TEXT, label: 'Location Short', required: true, sortOrder: 6 },
-  { fieldKey: 'addressLines', fieldType: ContentFieldType.TEXTAREA, label: 'Address Lines', required: false, sortOrder: 7 },
-  { fieldKey: 'mapEmbedUrl', fieldType: ContentFieldType.TEXT, label: 'Map Embed URL', required: false, sortOrder: 8 },
-  { fieldKey: 'image', fieldType: ContentFieldType.IMAGE, label: 'Image', required: true, sortOrder: 9 },
-  { fieldKey: 'summary', fieldType: ContentFieldType.TEXTAREA, label: 'Summary', required: true, sortOrder: 10 },
-  { fieldKey: 'bodyParagraphs', fieldType: ContentFieldType.TEXTAREA, label: 'Body Paragraphs', required: false, sortOrder: 11 },
-  { fieldKey: 'program', fieldType: ContentFieldType.HTML, label: 'Program', required: false, sortOrder: 12 },
-  { fieldKey: 'moderators', fieldType: ContentFieldType.HTML, label: 'Moderators', required: false, sortOrder: 13 },
+  { fieldKey: 'dateLabel', fieldType: ContentFieldType.TEXT, label: 'Date Label', required: true, sortOrder: 2 },
+  { fieldKey: 'startDate', fieldType: ContentFieldType.DATE, label: 'Start Date', required: true, sortOrder: 3 },
+  { fieldKey: 'endDate', fieldType: ContentFieldType.DATE, label: 'End Date', required: false, sortOrder: 4 },
+  { fieldKey: 'locationShort', fieldType: ContentFieldType.TEXT, label: 'Location Short', required: true, sortOrder: 5 },
+  { fieldKey: 'addressLines', fieldType: ContentFieldType.TEXTAREA, label: 'Address Lines', required: false, sortOrder: 6 },
+  { fieldKey: 'mapEmbedUrl', fieldType: ContentFieldType.TEXT, label: 'Map Embed URL', required: false, sortOrder: 7 },
+  { fieldKey: 'image', fieldType: ContentFieldType.IMAGE, label: 'Image', required: true, sortOrder: 8 },
+  { fieldKey: 'summary', fieldType: ContentFieldType.TEXTAREA, label: 'Summary', required: true, sortOrder: 9 },
+  { fieldKey: 'bodyHtml', fieldType: ContentFieldType.HTML, label: "Corps de l'événement", required: false, sortOrder: 10 },
+  { fieldKey: 'program', fieldType: ContentFieldType.PROGRAM_LIST, label: 'Programme', required: false, sortOrder: 11 },
+  { fieldKey: 'moderators', fieldType: ContentFieldType.MODERATOR_LIST, label: 'Intervenants', required: false, sortOrder: 12 },
 ];
 
 const departmentPageFieldDefinitions = [
   { fieldKey: 'name', fieldType: ContentFieldType.TEXT, label: 'Name', required: true, sortOrder: 1 },
-  { fieldKey: 'slug', fieldType: ContentFieldType.TEXT, label: 'Slug', required: true, sortOrder: 2 },
   {
     fieldKey: 'parentDepartmentId',
-    fieldType: ContentFieldType.NUMBER,
-    label: 'Parent department (linkedEntityId)',
+    fieldType: ContentFieldType.RELATION,
+    label: 'Département parent',
     required: false,
-    sortOrder: 3,
+    sortOrder: 2,
+    validation: {
+      targetContentTypeCode: 'DepartmentPage',
+      multiple: false,
+      storeAs: 'linkedEntityId',
+    },
   },
   {
     fieldKey: 'rbacDepartmentId',
     fieldType: ContentFieldType.ENTITY_RELATION,
     label: 'Département (RBAC)',
     required: false,
-    sortOrder: 4,
+    sortOrder: 3,
     validation: { targetLinkedEntityType: 'Department', multiple: false },
   },
-  { fieldKey: 'description', fieldType: ContentFieldType.TEXTAREA, label: 'Description', required: true, sortOrder: 5 },
-  { fieldKey: 'image', fieldType: ContentFieldType.IMAGE, label: 'Image', required: true, sortOrder: 6 },
-  { fieldKey: 'responsables', fieldType: ContentFieldType.PROFILE_LIST, label: 'Responsables', required: false, sortOrder: 7 },
-  { fieldKey: 'gallery', fieldType: ContentFieldType.IMAGES, label: 'Gallery', required: false, sortOrder: 8 },
+  { fieldKey: 'description', fieldType: ContentFieldType.TEXTAREA, label: 'Description', required: true, sortOrder: 4 },
+  { fieldKey: 'image', fieldType: ContentFieldType.IMAGE, label: 'Image', required: true, sortOrder: 5 },
+  { fieldKey: 'responsables', fieldType: ContentFieldType.PROFILE_LIST, label: 'Responsables', required: false, sortOrder: 6 },
+  { fieldKey: 'gallery', fieldType: ContentFieldType.IMAGES, label: 'Gallery', required: false, sortOrder: 7 },
   {
     fieldKey: 'songs',
     fieldType: ContentFieldType.ENTITY_RELATION,
     label: 'Songs',
     required: false,
-    sortOrder: 9,
+    sortOrder: 8,
     validation: { targetLinkedEntityType: 'Song', multiple: true },
   },
   {
@@ -374,10 +374,20 @@ const departmentPageFieldDefinitions = [
     fieldType: ContentFieldType.VIDEO_LIST,
     label: 'Videos',
     required: false,
-    sortOrder: 10,
+    sortOrder: 9,
   },
-  { fieldKey: 'subDepartmentSlugs', fieldType: ContentFieldType.TEXT, label: 'Sub Department Slugs', required: false, sortOrder: 11 },
-  { fieldKey: 'eventSlugs', fieldType: ContentFieldType.TEXT, label: 'Event Slugs', required: false, sortOrder: 12 },
+  {
+    fieldKey: 'eventSlugs',
+    fieldType: ContentFieldType.RELATION,
+    label: 'Événements liés',
+    required: false,
+    sortOrder: 10,
+    validation: {
+      targetContentTypeCode: 'ChurchEvent',
+      multiple: true,
+      storeAs: 'slug',
+    },
+  },
 ];
 
 const churchSiteProfileFieldDefinitions = [
@@ -388,9 +398,71 @@ const churchSiteProfileFieldDefinitions = [
   { fieldKey: 'serviceTimesHtml', fieldType: ContentFieldType.HTML, label: 'Service times', required: false, sortOrder: 5 },
   { fieldKey: 'contactEmail', fieldType: ContentFieldType.TEXT, label: 'Contact email', required: false, sortOrder: 6 },
   { fieldKey: 'contactPhone', fieldType: ContentFieldType.TEXT, label: 'Contact phone', required: false, sortOrder: 7 },
-  { fieldKey: 'socialLinks', fieldType: ContentFieldType.HTML, label: 'Social links (JSON array)', required: false, sortOrder: 8 },
+  { fieldKey: 'socialLinks', fieldType: ContentFieldType.SOCIAL_LINK_LIST, label: 'Liens sociaux', required: false, sortOrder: 8 },
   { fieldKey: 'heroImage', fieldType: ContentFieldType.IMAGE, label: 'Hero image URL', required: false, sortOrder: 9 },
-  { fieldKey: 'seoDefaults', fieldType: ContentFieldType.HTML, label: 'SEO defaults (JSON)', required: false, sortOrder: 10 },
+  {
+    fieldKey: 'programsHeadline',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Programmes — titre de section',
+    required: false,
+    sortOrder: 10,
+  },
+  {
+    fieldKey: 'programsIntro',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Programmes — introduction',
+    required: false,
+    sortOrder: 11,
+  },
+  {
+    fieldKey: 'weeklyPrograms',
+    fieldType: ContentFieldType.WEEKLY_PROGRAM_LIST,
+    label: 'Programmes — horaires hebdomadaires',
+    required: false,
+    sortOrder: 12,
+  },
+  {
+    fieldKey: 'contactHeadline',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Contact — titre de section',
+    required: false,
+    sortOrder: 13,
+  },
+  {
+    fieldKey: 'contactIntro',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Contact — introduction',
+    required: false,
+    sortOrder: 14,
+  },
+  {
+    fieldKey: 'mapEmbedUrl',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Contact — URL iframe carte',
+    required: false,
+    sortOrder: 15,
+  },
+  {
+    fieldKey: 'homeCellsIntro',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Contact — texte cellules de maison',
+    required: false,
+    sortOrder: 16,
+  },
+  {
+    fieldKey: 'homeCells',
+    fieldType: ContentFieldType.STRING_LIST,
+    label: 'Contact — noms des cellules',
+    required: false,
+    sortOrder: 17,
+  },
+  {
+    fieldKey: 'seoDefaults',
+    fieldType: ContentFieldType.SEO_DEFAULTS,
+    label: 'SEO (accueil) — titre, description, image, mots-clés',
+    required: false,
+    sortOrder: 18,
+  },
 ];
 
 const donationSettingsFieldDefinitions = [
@@ -403,15 +475,14 @@ const donationSettingsFieldDefinitions = [
 
 const albumFieldDefinitions: FieldSeedDef[] = [
   { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Title', required: true, sortOrder: 1 },
-  { fieldKey: 'slug', fieldType: ContentFieldType.TEXT, label: 'Slug', required: true, sortOrder: 2 },
-  { fieldKey: 'description', fieldType: ContentFieldType.TEXTAREA, label: 'Description', required: false, sortOrder: 3 },
-  { fieldKey: 'coverImage', fieldType: ContentFieldType.IMAGE, label: 'Cover image', required: false, sortOrder: 4 },
+  { fieldKey: 'description', fieldType: ContentFieldType.TEXTAREA, label: 'Description', required: false, sortOrder: 2 },
+  { fieldKey: 'coverImage', fieldType: ContentFieldType.IMAGE, label: 'Cover image', required: false, sortOrder: 3 },
   {
     fieldKey: 'songs',
     fieldType: ContentFieldType.ENTITY_RELATION,
     label: 'Songs',
     required: false,
-    sortOrder: 5,
+    sortOrder: 4,
     validation: { targetLinkedEntityType: 'Song', multiple: true },
   },
 ];
@@ -447,6 +518,9 @@ const playlistFieldDefinitions: FieldSeedDef[] = [
   },
 ];
 
+const DEFAULT_MAP_EMBED =
+  'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31831.72!2d15.28!3d-4.33!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNMKwMjAnUyAxNcKwMTcnRQ!5e0!3m2!1sen!2s!4v1';
+
 const churchSiteProfileData = {
   churchName: '5ème CELPA Salem',
   tagline: 'Un lieu de paix. Une marche de foi.',
@@ -461,10 +535,50 @@ const churchSiteProfileData = {
     { label: 'YouTube', url: 'https://youtube.com' },
   ],
   heroImage: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=1600&q=80',
+  programsHeadline: 'Nos Programmes',
+  programsIntro: 'Chaque rencontre est une étape dans votre parcours de foi',
+  weeklyPrograms: [
+    {
+      title: 'Culte Dominical',
+      day: 'Dimanche',
+      time: '09h00 – 12h00',
+      description:
+        "Un temps de louange, d'adoration et d'enseignement de la Parole. Venez tels que vous êtes, dans un esprit de paix et de communion fraternelle.",
+    },
+    {
+      title: 'Réunion de Prière',
+      day: 'Mercredi',
+      time: '18h00 – 20h00',
+      description:
+        "Un moment d'intercession et de prière communautaire. Ensemble, nous portons nos fardeaux devant le Seigneur dans la confiance et la foi.",
+    },
+    {
+      title: 'Étude Biblique',
+      day: 'Vendredi',
+      time: '18h00 – 19h30',
+      description:
+        'Approfondissez votre compréhension des Écritures à travers une étude structurée et interactive, guidée par nos enseignants.',
+    },
+    {
+      title: 'Rencontre des Jeunes',
+      day: 'Samedi',
+      time: '15h00 – 17h00',
+      description:
+        'Un espace dédié aux jeunes pour grandir dans la foi, partager et construire des liens fraternels solides.',
+    },
+  ],
+  contactHeadline: 'Contact & Cellules',
+  contactIntro: 'Nous sommes là pour vous accueillir',
+  mapEmbedUrl: DEFAULT_MAP_EMBED,
+  homeCellsIntro:
+    'Rejoignez une cellule de maison près de chez vous pour approfondir votre vie spirituelle en petit groupe dans un cadre intime et fraternel.',
+  homeCells: ['Cellule Béthel', 'Cellule Emmaüs', 'Cellule Sion', 'Cellule Morija'],
   seoDefaults: {
     title: 'CELPA Salem — Accueil',
-    description: 'Église réformée — louange, Parole et communauté.',
+    description:
+      'Église réformée à Kinshasa — cultes dominicaux, études bibliques, prière et cellules de maison. Louange, Parole et communauté.',
     ogImage: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=1200&q=80',
+    keywords: 'église Kinshasa, CELPA Salem, culte dimanche, cellule de maison, louange',
   },
 };
 
@@ -549,6 +663,18 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
     }
   }
 
+  async function removeObsoleteFieldDefs(
+    contentType: ContentType,
+    obsoleteKeys: string[],
+  ): Promise<void> {
+    for (const fieldKey of obsoleteKeys) {
+      await fieldRepo.delete({
+        contentType: { id: contentType.id },
+        fieldKey,
+      });
+    }
+  }
+
   async function upsertPublishedContent(
     contentType: ContentType,
     linkedEntityType: string,
@@ -612,6 +738,7 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
     allowedLinkedEntityTypes: ['Event'],
   });
   await ensureFieldDefs(churchEventType, churchEventFieldDefinitions);
+  await removeObsoleteFieldDefs(churchEventType, ['bodyParagraphs', 'slug']);
 
   const departmentPageType = await ensureContentType({
     name: 'DepartmentPage',
@@ -620,6 +747,7 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
     allowedLinkedEntityTypes: ['DepartmentPage'],
   });
   await ensureFieldDefs(departmentPageType, departmentPageFieldDefinitions);
+  await removeObsoleteFieldDefs(departmentPageType, ['subDepartmentSlugs', 'slug']);
 
   const churchSiteType = await ensureContentType({
     name: 'ChurchSiteProfile',
@@ -644,6 +772,7 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
     allowedLinkedEntityTypes: ['Album'],
   });
   await ensureFieldDefs(albumType, albumFieldDefinitions);
+  await removeObsoleteFieldDefs(albumType, ['slug']);
 
   const playlistType = await ensureContentType({
     name: 'Playlist',
@@ -671,7 +800,17 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
   console.log('✅ Upserted sample album content');
 
   for (let i = 0; i < churchEventsData.length; i++) {
-    await upsertPublishedContent(churchEventType, 'Event', i + 1, churchEventsData[i] as unknown as Record<string, unknown>);
+    const raw = churchEventsData[i] as Record<string, unknown>;
+    const paragraphs = raw['bodyParagraphs'];
+    const { bodyParagraphs: _removed, ...rest } = raw;
+    await upsertPublishedContent(churchEventType, 'Event', i + 1, {
+      ...rest,
+      bodyHtml: Array.isArray(paragraphs)
+        ? paragraphsToHtml(
+            paragraphs.filter((p): p is string => typeof p === 'string'),
+          )
+        : '',
+    });
   }
   console.log(`✅ Upserted ${churchEventsData.length} church events`);
 
@@ -774,7 +913,7 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
       allSeedSongIds.push(id);
     }
 
-    const { songs: _songs, ...rest } = raw;
+    const { songs: _songs, subDepartmentSlugs: _subSlugs, ...rest } = raw;
     await upsertPublishedContent(departmentPageType, 'DepartmentPage', i + 1, {
       ...rest,
       rbacDepartmentId,
