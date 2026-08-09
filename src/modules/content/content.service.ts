@@ -36,6 +36,7 @@ import { Department } from '../users/department.entity';
 import { User } from '../users/user.entity';
 import { UsersService } from '../users/users.service';
 import { ContentJwtUser, isAdminCmsUser } from './content.types';
+import { ContentLinkedStubService } from './content-linked-stub.service';
 
 export type PaginatedContents = {
   items: Content[];
@@ -72,6 +73,7 @@ export class ContentService {
     private readonly rbac: RbacService,
     private readonly dataSource: DataSource,
     private readonly usersService: UsersService,
+    private readonly linkedStubs: ContentLinkedStubService,
   ) {}
 
   private choirUserIdForRbac(principal: ContentJwtUser): number {
@@ -203,6 +205,10 @@ export class ContentService {
       throw new BadRequestException(`Unknown linkedEntityType: ${linkedType}`);
     }
     const table = LINKED_ENTITY_TABLE[linkedType];
+    if (!table) {
+      // Virtual link types (Event, DepartmentPage, SiteProfile, DonationSettings)
+      return;
+    }
     const rows = await this.dataSource.query(
       `SELECT 1 FROM "${table}" WHERE id = $1 LIMIT 1`,
       [linkedId],
@@ -212,6 +218,97 @@ export class ContentService {
         `Linked ${linkedType} with id ${linkedId} not found`,
       );
     }
+  }
+
+  private stubLabelFromFieldValues(
+    fieldValues: Record<string, unknown>,
+  ): string {
+    const title = fieldValues.title;
+    if (typeof title === 'string' && title.trim()) return title.trim();
+    const name = fieldValues.name;
+    if (typeof name === 'string' && name.trim()) return name.trim();
+    return '';
+  }
+
+  private async allocateVirtualLinkedEntityId(
+    linkedType: string,
+    singleton = false,
+  ): Promise<number> {
+    if (singleton) {
+      return 1;
+    }
+    const rows: { max: string | number | null }[] = await this.dataSource.query(
+      `SELECT MAX("linkedEntityId") AS max FROM contents WHERE "linkedEntityType" = $1`,
+      [linkedType],
+    );
+    const raw = rows[0]?.max;
+    const max =
+      typeof raw === 'number'
+        ? raw
+        : typeof raw === 'string'
+          ? Number.parseInt(raw, 10)
+          : 0;
+    return (Number.isFinite(max) ? max : 0) + 1;
+  }
+
+  private async resolveLinkedEntityForCreate(
+    type: ContentType,
+    dto: CreateContentDto,
+  ): Promise<{ linkedEntityType: string; linkedEntityId: number }> {
+    const allowed = type.allowedLinkedEntityTypes ?? [];
+    let linkedType = dto.linkedEntityType?.trim() || '';
+    let linkedId =
+      typeof dto.linkedEntityId === 'number' && Number.isFinite(dto.linkedEntityId)
+        ? dto.linkedEntityId
+        : undefined;
+
+    if (!linkedType) {
+      if (allowed.length === 1) {
+        linkedType = allowed[0];
+      } else if (allowed.length > 1) {
+        throw new BadRequestException(
+          'linkedEntityType is required when multiple link types are allowed',
+        );
+      } else {
+        throw new BadRequestException(
+          'No allowed linked entity type configured for this content type',
+        );
+      }
+    }
+
+    this.assertLinkedAllowedForType(type, linkedType);
+
+    if (linkedId == null) {
+      if (linkedType === 'Album') {
+        const stub = await this.linkedStubs.createAlbum(
+          this.stubLabelFromFieldValues(dto.fieldValues ?? {}),
+        );
+        linkedId = stub.id;
+      } else if (linkedType === 'Playlist') {
+        const stub = await this.linkedStubs.createPlaylist(
+          this.stubLabelFromFieldValues(dto.fieldValues ?? {}),
+        );
+        linkedId = stub.id;
+      } else if (
+        linkedType === 'SiteProfile' ||
+        linkedType === 'DonationSettings'
+      ) {
+        linkedId = await this.allocateVirtualLinkedEntityId(linkedType, true);
+      } else if (
+        linkedType === 'Event' ||
+        linkedType === 'DepartmentPage'
+      ) {
+        linkedId = await this.allocateVirtualLinkedEntityId(linkedType, false);
+      } else {
+        throw new BadRequestException(
+          'linkedEntityId is required for this linked entity type',
+        );
+      }
+    } else {
+      await this.assertLinkedRowExists(linkedType, linkedId);
+    }
+
+    return { linkedEntityType: linkedType, linkedEntityId: linkedId };
   }
 
   validateFieldValues(
@@ -768,8 +865,8 @@ export class ContentService {
     const { type, fields } = await this.loadTypeWithFields(dto.contentTypeId);
     if (!type.isActive) throw new BadRequestException('Content type is inactive');
 
-    this.assertLinkedAllowedForType(type, dto.linkedEntityType);
-    await this.assertLinkedRowExists(dto.linkedEntityType, dto.linkedEntityId);
+    const { linkedEntityType, linkedEntityId } =
+      await this.resolveLinkedEntityForCreate(type, dto);
 
     const audienceId = dto.audienceDepartmentId ?? null;
     if (!(await this.canWriteForAudience(principal, audienceId))) {
@@ -784,8 +881,8 @@ export class ContentService {
     const row = this.contentRepo.create({
       contentType: { id: dto.contentTypeId } as ContentType,
       fieldValues: cleaned,
-      linkedEntityType: dto.linkedEntityType,
-      linkedEntityId: dto.linkedEntityId,
+      linkedEntityType,
+      linkedEntityId,
       status: ContentStatus.DRAFT,
       visibility: dto.visibility ?? ContentVisibility.PRIVATE,
       audienceDepartment: audienceId

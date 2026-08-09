@@ -321,22 +321,22 @@ type FieldSeedDef = {
 };
 
 const churchEventFieldDefinitions = [
-  { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Title', required: true, sortOrder: 1 },
-  { fieldKey: 'dateLabel', fieldType: ContentFieldType.TEXT, label: 'Date Label', required: true, sortOrder: 2 },
-  { fieldKey: 'startDate', fieldType: ContentFieldType.DATE, label: 'Start Date', required: true, sortOrder: 3 },
-  { fieldKey: 'endDate', fieldType: ContentFieldType.DATE, label: 'End Date', required: false, sortOrder: 4 },
-  { fieldKey: 'locationShort', fieldType: ContentFieldType.TEXT, label: 'Location Short', required: true, sortOrder: 5 },
-  { fieldKey: 'addressLines', fieldType: ContentFieldType.TEXTAREA, label: 'Address Lines', required: false, sortOrder: 6 },
-  { fieldKey: 'mapEmbedUrl', fieldType: ContentFieldType.TEXT, label: 'Map Embed URL', required: false, sortOrder: 7 },
+  { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Titre', required: true, sortOrder: 1 },
+  { fieldKey: 'dateLabel', fieldType: ContentFieldType.TEXT, label: 'Libellé de date', required: true, sortOrder: 2 },
+  { fieldKey: 'startDate', fieldType: ContentFieldType.DATE, label: 'Date de début', required: true, sortOrder: 3 },
+  { fieldKey: 'endDate', fieldType: ContentFieldType.DATE, label: 'Date de fin', required: false, sortOrder: 4 },
+  { fieldKey: 'locationShort', fieldType: ContentFieldType.TEXT, label: 'Lieu (court)', required: true, sortOrder: 5 },
+  { fieldKey: 'addressLines', fieldType: ContentFieldType.TEXTAREA, label: 'Adresse', required: false, sortOrder: 6 },
+  { fieldKey: 'mapEmbedUrl', fieldType: ContentFieldType.TEXT, label: 'URL de la carte', required: false, sortOrder: 7 },
   { fieldKey: 'image', fieldType: ContentFieldType.IMAGE, label: 'Image', required: true, sortOrder: 8 },
-  { fieldKey: 'summary', fieldType: ContentFieldType.TEXTAREA, label: 'Summary', required: true, sortOrder: 9 },
+  { fieldKey: 'summary', fieldType: ContentFieldType.TEXTAREA, label: 'Résumé', required: true, sortOrder: 9 },
   { fieldKey: 'bodyHtml', fieldType: ContentFieldType.HTML, label: "Corps de l'événement", required: false, sortOrder: 10 },
   { fieldKey: 'program', fieldType: ContentFieldType.PROGRAM_LIST, label: 'Programme', required: false, sortOrder: 11 },
   { fieldKey: 'moderators', fieldType: ContentFieldType.MODERATOR_LIST, label: 'Intervenants', required: false, sortOrder: 12 },
 ];
 
 const departmentPageFieldDefinitions = [
-  { fieldKey: 'name', fieldType: ContentFieldType.TEXT, label: 'Name', required: true, sortOrder: 1 },
+  { fieldKey: 'name', fieldType: ContentFieldType.TEXT, label: 'Nom', required: true, sortOrder: 1 },
   {
     fieldKey: 'parentDepartmentId',
     fieldType: ContentFieldType.RELATION,
@@ -352,7 +352,7 @@ const departmentPageFieldDefinitions = [
   {
     fieldKey: 'rbacDepartmentId',
     fieldType: ContentFieldType.ENTITY_RELATION,
-    label: 'Département (RBAC)',
+    label: 'Département interne (permissions)',
     required: false,
     sortOrder: 3,
     validation: { targetLinkedEntityType: 'Department', multiple: false },
@@ -360,11 +360,11 @@ const departmentPageFieldDefinitions = [
   { fieldKey: 'description', fieldType: ContentFieldType.TEXTAREA, label: 'Description', required: true, sortOrder: 4 },
   { fieldKey: 'image', fieldType: ContentFieldType.IMAGE, label: 'Image', required: true, sortOrder: 5 },
   { fieldKey: 'responsables', fieldType: ContentFieldType.PROFILE_LIST, label: 'Responsables', required: false, sortOrder: 6 },
-  { fieldKey: 'gallery', fieldType: ContentFieldType.IMAGES, label: 'Gallery', required: false, sortOrder: 7 },
+  { fieldKey: 'gallery', fieldType: ContentFieldType.IMAGES, label: 'Galerie', required: false, sortOrder: 7 },
   {
     fieldKey: 'songs',
     fieldType: ContentFieldType.ENTITY_RELATION,
-    label: 'Songs',
+    label: 'Chants',
     required: false,
     sortOrder: 8,
     validation: { targetLinkedEntityType: 'Song', multiple: true },
@@ -372,7 +372,7 @@ const departmentPageFieldDefinitions = [
   {
     fieldKey: 'videos',
     fieldType: ContentFieldType.VIDEO_LIST,
-    label: 'Videos',
+    label: 'Vidéos',
     required: false,
     sortOrder: 9,
   },
@@ -391,15 +391,15 @@ const departmentPageFieldDefinitions = [
 ];
 
 const churchSiteProfileFieldDefinitions = [
-  { fieldKey: 'churchName', fieldType: ContentFieldType.TEXT, label: 'Church name', required: true, sortOrder: 1 },
-  { fieldKey: 'tagline', fieldType: ContentFieldType.TEXT, label: 'Tagline', required: false, sortOrder: 2 },
-  { fieldKey: 'aboutHtml', fieldType: ContentFieldType.HTML, label: 'About', required: false, sortOrder: 3 },
-  { fieldKey: 'address', fieldType: ContentFieldType.TEXTAREA, label: 'Address', required: false, sortOrder: 4 },
-  { fieldKey: 'serviceTimesHtml', fieldType: ContentFieldType.HTML, label: 'Service times', required: false, sortOrder: 5 },
-  { fieldKey: 'contactEmail', fieldType: ContentFieldType.TEXT, label: 'Contact email', required: false, sortOrder: 6 },
-  { fieldKey: 'contactPhone', fieldType: ContentFieldType.TEXT, label: 'Contact phone', required: false, sortOrder: 7 },
+  { fieldKey: 'churchName', fieldType: ContentFieldType.TEXT, label: "Nom de l'église", required: true, sortOrder: 1 },
+  { fieldKey: 'tagline', fieldType: ContentFieldType.TEXT, label: 'Accroche', required: false, sortOrder: 2 },
+  { fieldKey: 'aboutHtml', fieldType: ContentFieldType.HTML, label: 'À propos', required: false, sortOrder: 3 },
+  { fieldKey: 'address', fieldType: ContentFieldType.TEXTAREA, label: 'Adresse', required: false, sortOrder: 4 },
+  { fieldKey: 'serviceTimesHtml', fieldType: ContentFieldType.HTML, label: 'Horaires des cultes', required: false, sortOrder: 5 },
+  { fieldKey: 'contactEmail', fieldType: ContentFieldType.TEXT, label: 'E-mail de contact', required: false, sortOrder: 6 },
+  { fieldKey: 'contactPhone', fieldType: ContentFieldType.TEXT, label: 'Téléphone de contact', required: false, sortOrder: 7 },
   { fieldKey: 'socialLinks', fieldType: ContentFieldType.SOCIAL_LINK_LIST, label: 'Liens sociaux', required: false, sortOrder: 8 },
-  { fieldKey: 'heroImage', fieldType: ContentFieldType.IMAGE, label: 'Hero image URL', required: false, sortOrder: 9 },
+  { fieldKey: 'heroImage', fieldType: ContentFieldType.IMAGE, label: "Image d'accueil", required: false, sortOrder: 9 },
   {
     fieldKey: 'programsHeadline',
     fieldType: ContentFieldType.TEXT,
@@ -459,28 +459,34 @@ const churchSiteProfileFieldDefinitions = [
   {
     fieldKey: 'seoDefaults',
     fieldType: ContentFieldType.SEO_DEFAULTS,
-    label: 'SEO (accueil) — titre, description, image, mots-clés',
+    label: "SEO (accueil) — titre, description, image, mots-clés",
     required: false,
     sortOrder: 18,
   },
 ];
 
 const donationSettingsFieldDefinitions = [
-  { fieldKey: 'headline', fieldType: ContentFieldType.TEXT, label: 'Headline', required: true, sortOrder: 1 },
-  { fieldKey: 'bodyHtml', fieldType: ContentFieldType.HTML, label: 'Body', required: false, sortOrder: 2 },
-  { fieldKey: 'methods', fieldType: ContentFieldType.HTML, label: 'Methods (JSON array)', required: false, sortOrder: 3 },
-  { fieldKey: 'legalNoticeHtml', fieldType: ContentFieldType.HTML, label: 'Legal notice', required: false, sortOrder: 4 },
-  { fieldKey: 'receiptContact', fieldType: ContentFieldType.TEXT, label: 'Receipt contact', required: false, sortOrder: 5 },
+  { fieldKey: 'headline', fieldType: ContentFieldType.TEXT, label: 'Titre', required: true, sortOrder: 1 },
+  { fieldKey: 'bodyHtml', fieldType: ContentFieldType.HTML, label: 'Corps', required: false, sortOrder: 2 },
+  {
+    fieldKey: 'methods',
+    fieldType: ContentFieldType.HTML,
+    label: 'Moyens de don (JSON)',
+    required: false,
+    sortOrder: 3,
+  },
+  { fieldKey: 'legalNoticeHtml', fieldType: ContentFieldType.HTML, label: 'Mentions légales', required: false, sortOrder: 4 },
+  { fieldKey: 'receiptContact', fieldType: ContentFieldType.TEXT, label: 'Contact pour reçu', required: false, sortOrder: 5 },
 ];
 
 const albumFieldDefinitions: FieldSeedDef[] = [
-  { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Title', required: true, sortOrder: 1 },
+  { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Titre', required: true, sortOrder: 1 },
   { fieldKey: 'description', fieldType: ContentFieldType.TEXTAREA, label: 'Description', required: false, sortOrder: 2 },
-  { fieldKey: 'coverImage', fieldType: ContentFieldType.IMAGE, label: 'Cover image', required: false, sortOrder: 3 },
+  { fieldKey: 'coverImage', fieldType: ContentFieldType.IMAGE, label: 'Pochette', required: false, sortOrder: 3 },
   {
     fieldKey: 'songs',
     fieldType: ContentFieldType.ENTITY_RELATION,
-    label: 'Songs',
+    label: 'Chants',
     required: false,
     sortOrder: 4,
     validation: { targetLinkedEntityType: 'Song', multiple: true },
@@ -488,9 +494,9 @@ const albumFieldDefinitions: FieldSeedDef[] = [
 ];
 
 const playlistFieldDefinitions: FieldSeedDef[] = [
-  { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Title', required: true, sortOrder: 1 },
+  { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Titre', required: true, sortOrder: 1 },
   { fieldKey: 'description', fieldType: ContentFieldType.TEXTAREA, label: 'Description', required: false, sortOrder: 2 },
-  { fieldKey: 'composers', fieldType: ContentFieldType.TEXTAREA, label: 'Composers', required: false, sortOrder: 3 },
+  { fieldKey: 'composers', fieldType: ContentFieldType.TEXTAREA, label: 'Compositeurs', required: false, sortOrder: 3 },
   {
     fieldKey: 'participants',
     fieldType: ContentFieldType.PROFILE_LIST,
@@ -498,8 +504,8 @@ const playlistFieldDefinitions: FieldSeedDef[] = [
     required: false,
     sortOrder: 4,
   },
-  { fieldKey: 'audio_url', fieldType: ContentFieldType.TEXT, label: 'Audio URL', required: false, sortOrder: 5 },
-  { fieldKey: 'video_url', fieldType: ContentFieldType.TEXT, label: 'Video URL', required: false, sortOrder: 6 },
+  { fieldKey: 'audio_url', fieldType: ContentFieldType.TEXT, label: 'URL audio', required: false, sortOrder: 5 },
+  { fieldKey: 'video_url', fieldType: ContentFieldType.TEXT, label: 'URL vidéo', required: false, sortOrder: 6 },
   {
     fieldKey: 'album',
     fieldType: ContentFieldType.RELATION,
@@ -511,7 +517,7 @@ const playlistFieldDefinitions: FieldSeedDef[] = [
   {
     fieldKey: 'songs',
     fieldType: ContentFieldType.ENTITY_RELATION,
-    label: 'Songs',
+    label: 'Chants',
     required: false,
     sortOrder: 8,
     validation: { targetLinkedEntityType: 'Song', multiple: true },
@@ -732,50 +738,50 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
   }
 
   const churchEventType = await ensureContentType({
-    name: 'ChurchEvent',
+    name: 'Événements',
     code: 'ChurchEvent',
-    description: 'Church event with program, moderators, and location details',
+    description: 'Événement d’église avec programme, intervenants et lieu',
     allowedLinkedEntityTypes: ['Event'],
   });
   await ensureFieldDefs(churchEventType, churchEventFieldDefinitions);
   await removeObsoleteFieldDefs(churchEventType, ['bodyParagraphs', 'slug']);
 
   const departmentPageType = await ensureContentType({
-    name: 'DepartmentPage',
+    name: 'Départements',
     code: 'DepartmentPage',
-    description: 'Department page with description, gallery, songs, and videos',
+    description: 'Page département avec description, galerie, chants et vidéos',
     allowedLinkedEntityTypes: ['DepartmentPage'],
   });
   await ensureFieldDefs(departmentPageType, departmentPageFieldDefinitions);
   await removeObsoleteFieldDefs(departmentPageType, ['subDepartmentSlugs', 'slug']);
 
   const churchSiteType = await ensureContentType({
-    name: 'ChurchSiteProfile',
+    name: 'Profil du site',
     code: 'ChurchSiteProfile',
-    description: 'Public church / website profile singleton',
+    description: 'Profil public de l’église / site web (singleton)',
     allowedLinkedEntityTypes: ['SiteProfile'],
   });
   await ensureFieldDefs(churchSiteType, churchSiteProfileFieldDefinitions);
 
   const donationType = await ensureContentType({
-    name: 'DonationSettings',
+    name: 'Dons',
     code: 'DonationSettings',
-    description: 'Public donation copy and methods singleton',
+    description: 'Textes et moyens de don publics (singleton)',
     allowedLinkedEntityTypes: ['DonationSettings'],
   });
   await ensureFieldDefs(donationType, donationSettingsFieldDefinitions);
 
   const albumType = await ensureContentType({
-    name: 'Album',
+    name: 'Albums',
     code: 'Album',
-    description: 'Album musical / compilation référencée par les playlists',
+    description: 'Album musical / compilation référencée par les listes de lecture',
     allowedLinkedEntityTypes: ['Album'],
   });
   await ensureFieldDefs(albumType, albumFieldDefinitions);
   await removeObsoleteFieldDefs(albumType, ['slug']);
 
   const playlistType = await ensureContentType({
-    name: 'Playlist',
+    name: 'Listes de lecture',
     code: 'Playlist',
     description: 'Liste de lecture avec participants et lien album optionnel',
     allowedLinkedEntityTypes: ['Playlist'],

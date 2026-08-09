@@ -19,14 +19,16 @@ export class CreateContentDto {
   @IsInt()
   contentTypeId: number;
 
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(120)
-  linkedEntityType: string;
+  linkedEntityType?: string;
 
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
-  linkedEntityId: number;
+  linkedEntityId?: number;
 
   @IsObject()
   fieldValues: Record<string, unknown>;

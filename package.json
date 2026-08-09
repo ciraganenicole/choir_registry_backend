@@ -30,7 +30,7 @@
     "migration:create": "typeorm-ts-node-commonjs migration:create",
     "migration:revert": "npm run typeorm -- migration:revert -d src/data-source.ts",
     "seed": "ts-node src/database/seeds/runSeed.ts",
-    "seed:content": "ts-node src/database/seeds/content.seed.ts"
+    "seed:content": "ts-node src/database/seeds/runContentSeed.ts"
   },
   "dependencies": {
     "@faker-js/faker": "^9.5.0",
