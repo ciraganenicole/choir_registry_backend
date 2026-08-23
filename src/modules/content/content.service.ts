@@ -940,6 +940,29 @@ export class ContentService {
     return this.contentRepo.save(row);
   }
 
+  async removeContent(principal: ContentJwtUser, id: number): Promise<void> {
+    await this.assertModuleAccess(principal);
+    const row = await this.contentRepo.findOne({
+      where: { id },
+      relations: ['contentType', 'audienceDepartment'],
+    });
+    if (!row) throw new NotFoundException('Content not found');
+
+    const typeCode = row.contentType?.code;
+    if (typeCode === 'ChurchSiteProfile' || typeCode === 'DonationSettings') {
+      throw new BadRequestException(
+        'Ce contenu singleton ne peut pas être supprimé.',
+      );
+    }
+
+    const audienceId = row.audienceDepartment?.id ?? null;
+    if (!(await this.canWriteForAudience(principal, audienceId))) {
+      throw new ForbiddenException('Cannot delete this content');
+    }
+
+    await this.contentRepo.delete({ id });
+  }
+
   private assertStatusTransition(from: ContentStatus, to: ContentStatus) {
     if (from === to) return;
     if (from === ContentStatus.PUBLISHED) {

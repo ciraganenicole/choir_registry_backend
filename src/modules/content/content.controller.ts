@@ -178,6 +178,15 @@ export class ContentController {
     return this.contentService.updateContent(user, id, dto);
   }
 
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  removeContent(
+    @CurrentUser() user: ContentJwtUser,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.contentService.removeContent(user, id);
+  }
+
   @Post(':id/approve')
   @UseGuards(JwtAuthGuard)
   approve(
