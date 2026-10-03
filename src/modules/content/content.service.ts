@@ -59,6 +59,7 @@ const LINKED_ENTITY_TABLE: Record<LinkedEntityType, string> = {
   DonationSettings: '',
   Album: 'albums',
   Playlist: 'playlists',
+  Teaching: '',
 };
 
 @Injectable()
@@ -296,7 +297,8 @@ export class ContentService {
         linkedId = await this.allocateVirtualLinkedEntityId(linkedType, true);
       } else if (
         linkedType === 'Event' ||
-        linkedType === 'DepartmentPage'
+        linkedType === 'DepartmentPage' ||
+        linkedType === 'Teaching'
       ) {
         linkedId = await this.allocateVirtualLinkedEntityId(linkedType, false);
       } else {
@@ -457,6 +459,13 @@ export class ContentService {
           ) {
             throw bad();
           }
+          if (
+            o.bio !== undefined &&
+            o.bio !== null &&
+            typeof o.bio !== 'string'
+          ) {
+            throw bad();
+          }
         }
         break;
       }
@@ -558,6 +567,70 @@ export class ContentService {
         }
         break;
       }
+      case ContentFieldType.RECURRING_PROGRAM_LIST: {
+        if (!Array.isArray(v)) throw bad();
+        for (const item of v) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            throw bad();
+          }
+          const o = item as Record<string, unknown>;
+          if (typeof o.id !== 'string' || !o.id.trim()) throw bad();
+          if (typeof o.title !== 'string' || !o.title.trim()) throw bad();
+          if (typeof o.time !== 'string' || !o.time.trim()) throw bad();
+          if (!Array.isArray(o.daysOfWeek) || o.daysOfWeek.length === 0) {
+            throw bad();
+          }
+          for (const d of o.daysOfWeek) {
+            const n = typeof d === 'number' ? d : Number(d);
+            if (!Number.isInteger(n) || n < 0 || n > 6) throw bad();
+          }
+          if (o.isActive !== undefined && typeof o.isActive !== 'boolean') {
+            throw bad();
+          }
+          if (o.steps !== undefined && o.steps !== null) {
+            if (!Array.isArray(o.steps)) throw bad();
+            for (const step of o.steps) {
+              if (!step || typeof step !== 'object' || Array.isArray(step)) {
+                throw bad();
+              }
+              const s = step as Record<string, unknown>;
+              if (typeof s.title !== 'string') throw bad();
+              if (
+                s.description !== undefined &&
+                s.description !== null &&
+                typeof s.description !== 'string'
+              ) {
+                throw bad();
+              }
+            }
+          }
+        }
+        break;
+      }
+      case ContentFieldType.SCHEDULE_OVERRIDE_LIST: {
+        if (!Array.isArray(v)) throw bad();
+        for (const item of v) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            throw bad();
+          }
+          const o = item as Record<string, unknown>;
+          if (typeof o.id !== 'string' || !o.id.trim()) throw bad();
+          if (typeof o.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(o.date)) {
+            throw bad();
+          }
+          if (o.kind !== 'add' && o.kind !== 'hide') throw bad();
+          if (o.kind === 'hide') {
+            if (typeof o.programId !== 'string' || !o.programId.trim()) {
+              throw bad();
+            }
+          }
+          if (o.kind === 'add') {
+            if (typeof o.title !== 'string' || !o.title.trim()) throw bad();
+            if (typeof o.time !== 'string' || !o.time.trim()) throw bad();
+          }
+        }
+        break;
+      }
       case ContentFieldType.MODERATOR_LIST: {
         if (!Array.isArray(v)) throw bad();
         for (const item of v) {
@@ -588,6 +661,82 @@ export class ContentService {
         if (!Array.isArray(v)) throw bad();
         for (const item of v) {
           if (typeof item !== 'string') throw bad();
+        }
+        break;
+      }
+      case ContentFieldType.SCRIPTURE: {
+        if (!v || typeof v !== 'object' || Array.isArray(v)) throw bad();
+        const o = v as Record<string, unknown>;
+        if (typeof o.text !== 'string' || !o.text.trim()) throw bad();
+        if (typeof o.reference !== 'string' || !o.reference.trim()) throw bad();
+        break;
+      }
+      case ContentFieldType.TEACHING_JOURNEY_LIST: {
+        if (!Array.isArray(v)) throw bad();
+        for (const item of v) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            throw bad();
+          }
+          const o = item as Record<string, unknown>;
+          if (typeof o.key !== 'string' || !o.key.trim()) throw bad();
+          if (typeof o.label !== 'string' || !o.label.trim()) throw bad();
+          if (typeof o.statement !== 'string' || !o.statement.trim()) {
+            throw bad();
+          }
+          if (typeof o.guidance !== 'string' || !o.guidance.trim()) {
+            throw bad();
+          }
+          if (typeof o.actionLabel !== 'string' || !o.actionLabel.trim()) {
+            throw bad();
+          }
+          if (
+            o.hasNote !== undefined &&
+            o.hasNote !== null &&
+            typeof o.hasNote !== 'boolean'
+          ) {
+            throw bad();
+          }
+          if (
+            o.notePlaceholder !== undefined &&
+            o.notePlaceholder !== null &&
+            typeof o.notePlaceholder !== 'string'
+          ) {
+            throw bad();
+          }
+        }
+        break;
+      }
+      case ContentFieldType.GALLERY_ITEM_LIST: {
+        if (!Array.isArray(v)) throw bad();
+        for (const item of v) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            throw bad();
+          }
+          const o = item as Record<string, unknown>;
+          if (typeof o.imageUrl !== 'string' || !o.imageUrl.trim()) {
+            throw bad();
+          }
+          if (
+            o.caption !== undefined &&
+            o.caption !== null &&
+            typeof o.caption !== 'string'
+          ) {
+            throw bad();
+          }
+          if (
+            o.alt !== undefined &&
+            o.alt !== null &&
+            typeof o.alt !== 'string'
+          ) {
+            throw bad();
+          }
+          if (
+            o.large !== undefined &&
+            o.large !== null &&
+            typeof o.large !== 'boolean'
+          ) {
+            throw bad();
+          }
         }
         break;
       }

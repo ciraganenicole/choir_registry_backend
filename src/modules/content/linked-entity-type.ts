@@ -16,6 +16,7 @@ export const LINKED_ENTITY_TYPES = [
   'DonationSettings',
   'Album',
   'Playlist',
+  'Teaching',
 ] as const;
 
 export type LinkedEntityType = (typeof LINKED_ENTITY_TYPES)[number];

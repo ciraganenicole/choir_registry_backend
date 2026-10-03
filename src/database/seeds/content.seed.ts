@@ -5,6 +5,7 @@ import { Content } from '../../modules/content/content.entity';
 import { ContentFieldType } from '../../modules/content/enums/content-field-type.enum';
 import { ContentStatus } from '../../modules/content/enums/content-status.enum';
 import { ContentVisibility } from '../../modules/content/enums/content-visibility.enum';
+import { slugify } from '../../modules/content/content-slug.util';
 import {
   Song,
   SongDifficulty,
@@ -317,8 +318,23 @@ type FieldSeedDef = {
   label: string;
   required: boolean;
   sortOrder: number;
+  showInTable?: boolean;
   validation?: Record<string, unknown> | null;
 };
+
+/**
+ * Optional notification (call to action) fields shared by teachings, events and
+ * community updates. When `notify` is enabled the entry is surfaced in the
+ * public notification center via `GET /public/content/notifications`.
+ */
+const notificationFieldDefinitions: FieldSeedDef[] = [
+  { fieldKey: 'notify', fieldType: ContentFieldType.BOOLEAN, label: 'Afficher une notification', required: false, sortOrder: 50 },
+  { fieldKey: 'notificationTitle', fieldType: ContentFieldType.TEXT, label: 'Notification — titre', required: false, sortOrder: 51 },
+  { fieldKey: 'notificationMessage', fieldType: ContentFieldType.TEXTAREA, label: 'Notification — message', required: false, sortOrder: 52 },
+  { fieldKey: 'notificationCtaLabel', fieldType: ContentFieldType.TEXT, label: 'Notification — libellé du bouton', required: false, sortOrder: 53 },
+  { fieldKey: 'notificationCtaHref', fieldType: ContentFieldType.TEXT, label: 'Notification — lien du bouton', required: false, sortOrder: 54 },
+  { fieldKey: 'notificationTag', fieldType: ContentFieldType.TEXT, label: 'Notification — catégorie', required: false, sortOrder: 55 },
+];
 
 const churchEventFieldDefinitions = [
   { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Titre', required: true, sortOrder: 1 },
@@ -333,6 +349,7 @@ const churchEventFieldDefinitions = [
   { fieldKey: 'bodyHtml', fieldType: ContentFieldType.HTML, label: "Corps de l'événement", required: false, sortOrder: 10 },
   { fieldKey: 'program', fieldType: ContentFieldType.PROGRAM_LIST, label: 'Programme', required: false, sortOrder: 11 },
   { fieldKey: 'moderators', fieldType: ContentFieldType.MODERATOR_LIST, label: 'Intervenants', required: false, sortOrder: 12 },
+  ...notificationFieldDefinitions,
 ];
 
 const departmentPageFieldDefinitions = [
@@ -422,46 +439,263 @@ const churchSiteProfileFieldDefinitions = [
     sortOrder: 12,
   },
   {
+    fieldKey: 'recurringPrograms',
+    fieldType: ContentFieldType.RECURRING_PROGRAM_LIST,
+    label: 'Programmes principaux (modèle hebdomadaire)',
+    required: false,
+    sortOrder: 13,
+  },
+  {
     fieldKey: 'contactHeadline',
     fieldType: ContentFieldType.TEXT,
     label: 'Contact — titre de section',
     required: false,
-    sortOrder: 13,
+    sortOrder: 15,
   },
   {
     fieldKey: 'contactIntro',
     fieldType: ContentFieldType.TEXTAREA,
     label: 'Contact — introduction',
     required: false,
-    sortOrder: 14,
+    sortOrder: 16,
   },
   {
     fieldKey: 'mapEmbedUrl',
     fieldType: ContentFieldType.TEXT,
     label: 'Contact — URL iframe carte',
     required: false,
-    sortOrder: 15,
+    sortOrder: 17,
   },
   {
     fieldKey: 'homeCellsIntro',
     fieldType: ContentFieldType.TEXTAREA,
     label: 'Contact — texte cellules de maison',
     required: false,
-    sortOrder: 16,
+    sortOrder: 18,
   },
   {
     fieldKey: 'homeCells',
     fieldType: ContentFieldType.STRING_LIST,
     label: 'Contact — noms des cellules',
     required: false,
-    sortOrder: 17,
+    sortOrder: 19,
   },
   {
     fieldKey: 'seoDefaults',
     fieldType: ContentFieldType.SEO_DEFAULTS,
     label: "SEO (accueil) — titre, description, image, mots-clés",
     required: false,
-    sortOrder: 18,
+    sortOrder: 20,
+  },
+  {
+    fieldKey: 'pastorQuote',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Pasteur — citation',
+    required: false,
+    sortOrder: 21,
+  },
+  {
+    fieldKey: 'pastorMessage',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Pasteur — message',
+    required: false,
+    sortOrder: 22,
+  },
+  {
+    fieldKey: 'pastorName',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Pasteur — nom',
+    required: false,
+    sortOrder: 23,
+  },
+  {
+    fieldKey: 'pastorRole',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Pasteur — rôle',
+    required: false,
+    sortOrder: 24,
+  },
+  {
+    fieldKey: 'visionTitle',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Vision — titre',
+    required: false,
+    sortOrder: 25,
+  },
+  {
+    fieldKey: 'visionSummary',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Vision — résumé',
+    required: false,
+    sortOrder: 26,
+  },
+  {
+    fieldKey: 'visionParagraphs',
+    fieldType: ContentFieldType.STRING_LIST,
+    label: 'Vision — paragraphes',
+    required: false,
+    sortOrder: 27,
+  },
+  {
+    fieldKey: 'departmentsIntroTitle',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Départements (page) — titre',
+    required: false,
+    sortOrder: 28,
+  },
+  {
+    fieldKey: 'departmentsIntroSummary',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Départements (page) — résumé',
+    required: false,
+    sortOrder: 29,
+  },
+  {
+    fieldKey: 'departmentsIntroParagraphs',
+    fieldType: ContentFieldType.STRING_LIST,
+    label: 'Départements (page) — paragraphes',
+    required: false,
+    sortOrder: 30,
+  },
+  {
+    fieldKey: 'responsablesTitle',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Responsables — titre',
+    required: false,
+    sortOrder: 31,
+  },
+  {
+    fieldKey: 'responsablesSummary',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Responsables — résumé',
+    required: false,
+    sortOrder: 32,
+  },
+  {
+    fieldKey: 'responsablesParagraphs',
+    fieldType: ContentFieldType.STRING_LIST,
+    label: 'Responsables — paragraphes',
+    required: false,
+    sortOrder: 33,
+  },
+  {
+    fieldKey: 'churchLeaders',
+    fieldType: ContentFieldType.PROFILE_LIST,
+    label: 'Responsables — dirigeants',
+    required: false,
+    sortOrder: 34,
+  },
+  {
+    fieldKey: 'historyTitle',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Histoire — titre',
+    required: false,
+    sortOrder: 35,
+  },
+  {
+    fieldKey: 'historySummary',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Histoire — résumé',
+    required: false,
+    sortOrder: 36,
+  },
+  {
+    fieldKey: 'historyParagraphs',
+    fieldType: ContentFieldType.STRING_LIST,
+    label: 'Histoire — paragraphes',
+    required: false,
+    sortOrder: 37,
+  },
+  {
+    fieldKey: 'galleryEyebrow',
+    fieldType: ContentFieldType.TEXT,
+    label: 'La vie à Salem — surtitre',
+    required: false,
+    sortOrder: 38,
+  },
+  {
+    fieldKey: 'galleryTitle',
+    fieldType: ContentFieldType.TEXT,
+    label: 'La vie à Salem — titre',
+    required: false,
+    sortOrder: 39,
+  },
+  {
+    fieldKey: 'galleryItems',
+    fieldType: ContentFieldType.GALLERY_ITEM_LIST,
+    label: 'La vie à Salem — galerie',
+    required: false,
+    sortOrder: 40,
+  },
+  {
+    fieldKey: 'communityEyebrow',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Communauté — surtitre',
+    required: false,
+    sortOrder: 41,
+  },
+  {
+    fieldKey: 'communityTitle',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Communauté — titre',
+    required: false,
+    sortOrder: 42,
+  },
+  {
+    fieldKey: 'communityIntro',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Communauté — introduction',
+    required: false,
+    sortOrder: 43,
+  },
+  {
+    fieldKey: 'liveChannelUrl',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Live — URL de la chaîne',
+    required: false,
+    sortOrder: 44,
+  },
+  {
+    fieldKey: 'livePageTitle',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Live — titre de la page',
+    required: false,
+    sortOrder: 45,
+  },
+  {
+    fieldKey: 'visitEyebrow',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Première visite — surtitre',
+    required: false,
+    sortOrder: 46,
+  },
+  {
+    fieldKey: 'visitTitle',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Première visite — titre',
+    required: false,
+    sortOrder: 47,
+  },
+  {
+    fieldKey: 'visitBody',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Première visite — texte',
+    required: false,
+    sortOrder: 48,
+  },
+  {
+    fieldKey: 'visitCtaLabel',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Première visite — libellé du bouton',
+    required: false,
+    sortOrder: 49,
+  },
+  {
+    fieldKey: 'visitCtaHref',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Première visite — lien du bouton',
+    required: false,
+    sortOrder: 50,
   },
 ];
 
@@ -477,6 +711,69 @@ const donationSettingsFieldDefinitions = [
   },
   { fieldKey: 'legalNoticeHtml', fieldType: ContentFieldType.HTML, label: 'Mentions légales', required: false, sortOrder: 4 },
   { fieldKey: 'receiptContact', fieldType: ContentFieldType.TEXT, label: 'Contact pour reçu', required: false, sortOrder: 5 },
+  {
+    fieldKey: 'spotlightEyebrow',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Spotlight collecte — surtitre',
+    required: false,
+    sortOrder: 6,
+  },
+  {
+    fieldKey: 'spotlightTitle',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Spotlight collecte — titre',
+    required: false,
+    sortOrder: 7,
+  },
+  {
+    fieldKey: 'spotlightDescription',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Spotlight collecte — description',
+    required: false,
+    sortOrder: 8,
+  },
+  {
+    fieldKey: 'spotlightPhase',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Spotlight collecte — phase',
+    required: false,
+    sortOrder: 9,
+  },
+  {
+    fieldKey: 'spotlightPercent',
+    fieldType: ContentFieldType.NUMBER,
+    label: 'Spotlight collecte — progression (%)',
+    required: false,
+    sortOrder: 10,
+  },
+  {
+    fieldKey: 'spotlightImage',
+    fieldType: ContentFieldType.IMAGE,
+    label: 'Spotlight collecte — image',
+    required: false,
+    sortOrder: 11,
+  },
+];
+
+const communityUpdateFieldDefinitions: FieldSeedDef[] = [
+  { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Titre', required: true, sortOrder: 1, showInTable: true },
+  { fieldKey: 'meta', fieldType: ContentFieldType.TEXT, label: 'Surtitre', required: false, sortOrder: 2 },
+  { fieldKey: 'tone', fieldType: ContentFieldType.TEXT, label: 'Tonalité (green | orange)', required: false, sortOrder: 3 },
+  { fieldKey: 'description', fieldType: ContentFieldType.TEXTAREA, label: 'Description', required: false, sortOrder: 4 },
+  { fieldKey: 'ctaLabel', fieldType: ContentFieldType.TEXT, label: 'Libellé du bouton', required: false, sortOrder: 5 },
+  { fieldKey: 'ctaVariant', fieldType: ContentFieldType.TEXT, label: 'Style du bouton', required: false, sortOrder: 6 },
+  { fieldKey: 'href', fieldType: ContentFieldType.TEXT, label: 'Lien', required: false, sortOrder: 7 },
+  { fieldKey: 'displayOrder', fieldType: ContentFieldType.NUMBER, label: 'Ordre d’affichage', required: false, sortOrder: 8 },
+  ...notificationFieldDefinitions,
+];
+
+const liveEventFieldDefinitions: FieldSeedDef[] = [
+  { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Titre', required: true, sortOrder: 1, showInTable: true },
+  { fieldKey: 'videoId', fieldType: ContentFieldType.TEXT, label: 'Identifiant YouTube', required: true, sortOrder: 2 },
+  { fieldKey: 'thumbnail', fieldType: ContentFieldType.IMAGE, label: 'Miniature', required: false, sortOrder: 3 },
+  { fieldKey: 'publishedAt', fieldType: ContentFieldType.DATE, label: 'Date de publication', required: false, sortOrder: 4 },
+  { fieldKey: 'startSeconds', fieldType: ContentFieldType.NUMBER, label: 'Démarrage (secondes)', required: false, sortOrder: 5 },
+  { fieldKey: 'displayOrder', fieldType: ContentFieldType.NUMBER, label: 'Ordre d’affichage', required: false, sortOrder: 6 },
 ];
 
 const albumFieldDefinitions: FieldSeedDef[] = [
@@ -524,68 +821,622 @@ const playlistFieldDefinitions: FieldSeedDef[] = [
   },
 ];
 
-const DEFAULT_MAP_EMBED =
-  'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31831.72!2d15.28!3d-4.33!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNMKwMjAnUyAxNcKwMTcnRQ!5e0!3m2!1sen!2s!4v1';
+const teachingFieldDefinitions: FieldSeedDef[] = [
+  {
+    fieldKey: 'title',
+    fieldType: ContentFieldType.TEXT,
+    label: 'Titre',
+    required: true,
+    sortOrder: 1,
+    showInTable: true,
+  },
+  {
+    fieldKey: 'titleLines',
+    fieldType: ContentFieldType.STRING_LIST,
+    label: 'Titre (lignes d’affichage)',
+    required: false,
+    sortOrder: 2,
+  },
+  { fieldKey: 'category', fieldType: ContentFieldType.TEXT, label: 'Catégorie', required: true, sortOrder: 3 },
+  { fieldKey: 'pastor', fieldType: ContentFieldType.TEXT, label: 'Pasteur / orateur', required: true, sortOrder: 4 },
+  { fieldKey: 'duration', fieldType: ContentFieldType.TEXT, label: 'Durée', required: false, sortOrder: 5 },
+  { fieldKey: 'reference', fieldType: ContentFieldType.TEXT, label: 'Référence biblique', required: false, sortOrder: 6 },
+  { fieldKey: 'date', fieldType: ContentFieldType.TEXT, label: 'Date (libellé)', required: false, sortOrder: 7 },
+  { fieldKey: 'summary', fieldType: ContentFieldType.TEXTAREA, label: 'Résumé', required: true, sortOrder: 8 },
+  {
+    fieldKey: 'essentialIdea',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'Idée essentielle',
+    required: true,
+    sortOrder: 9,
+  },
+  {
+    fieldKey: 'overviewTitle',
+    fieldType: ContentFieldType.TEXT,
+    label: 'À retenir — titre',
+    required: false,
+    sortOrder: 10,
+  },
+  {
+    fieldKey: 'overviewParagraph',
+    fieldType: ContentFieldType.TEXTAREA,
+    label: 'À retenir — texte',
+    required: false,
+    sortOrder: 11,
+  },
+  {
+    fieldKey: 'scripture',
+    fieldType: ContentFieldType.SCRIPTURE,
+    label: 'Verset',
+    required: true,
+    sortOrder: 12,
+  },
+  {
+    fieldKey: 'coverImage',
+    fieldType: ContentFieldType.IMAGE,
+    label: 'Image de couverture',
+    required: false,
+    sortOrder: 13,
+  },
+  {
+    fieldKey: 'journey',
+    fieldType: ContentFieldType.TEACHING_JOURNEY_LIST,
+    label: 'Parcours de foi',
+    required: true,
+    sortOrder: 14,
+  },
+  ...notificationFieldDefinitions,
+];
 
+const programmeFieldDefinitions: FieldSeedDef[] = [
+  { fieldKey: 'title', fieldType: ContentFieldType.TEXT, label: 'Titre', required: true, sortOrder: 1, showInTable: true },
+  { fieldKey: 'subtitle', fieldType: ContentFieldType.TEXT, label: 'Sous-titre', required: false, sortOrder: 2 },
+  { fieldKey: 'meta', fieldType: ContentFieldType.TEXT, label: 'Catégorie / surtitre', required: false, sortOrder: 3 },
+  { fieldKey: 'date', fieldType: ContentFieldType.DATE, label: 'Date', required: true, sortOrder: 4, showInTable: true },
+  { fieldKey: 'time', fieldType: ContentFieldType.TEXT, label: 'Heure de début', required: true, sortOrder: 5 },
+  { fieldKey: 'endTime', fieldType: ContentFieldType.TEXT, label: 'Heure de fin', required: false, sortOrder: 6 },
+  { fieldKey: 'location', fieldType: ContentFieldType.TEXT, label: 'Lieu', required: false, sortOrder: 7 },
+  { fieldKey: 'description', fieldType: ContentFieldType.TEXTAREA, label: 'Description', required: false, sortOrder: 8 },
+  { fieldKey: 'steps', fieldType: ContentFieldType.PARTICIPATION_LIST, label: 'Comment participer', required: false, sortOrder: 9 },
+  { fieldKey: 'actionLabel', fieldType: ContentFieldType.TEXT, label: 'Libellé du bouton', required: false, sortOrder: 10 },
+  { fieldKey: 'sourceProgramId', fieldType: ContentFieldType.TEXT, label: 'Programme source (modèle)', required: false, sortOrder: 11 },
+  { fieldKey: 'isCustom', fieldType: ContentFieldType.BOOLEAN, label: 'Programme personnalisé', required: false, sortOrder: 12 },
+  { fieldKey: 'displayOrder', fieldType: ContentFieldType.NUMBER, label: 'Ordre d’affichage', required: false, sortOrder: 13 },
+];
+
+const teachingsData = [
+  {
+    title: 'La puissance du pardon',
+    titleLines: ['La puissance', 'du pardon'],
+    category: 'FOI & PARDON',
+    pastor: 'Pasteur Luc Mbuyi',
+    duration: '32 min',
+    reference: 'Colossiens 3',
+    date: '13 septembre 2026',
+    summary:
+      "Pardonner ne nie pas la blessure. C'est choisir de ne plus lui confier la direction de notre vie.",
+    essentialIdea: 'La paix commence parfois par le premier pas que personne ne voit.',
+    overviewTitle:
+      "Le pardon n'efface pas l'histoire. Il change ce qu'elle peut encore contrôler.",
+    overviewParagraph:
+      "Dans cet enseignement, nous découvrons que le pardon est d'abord une décision spirituelle : remettre à Dieu la douleur, refuser de vivre sous son emprise et choisir un chemin qui conduit vers la paix.",
+    scripture: {
+      text: '« Supportez-vous les uns les autres, et, si l\'un a sujet de se plaindre de l\'autre, pardonnez-vous réciproquement. »',
+      reference: 'Colossiens 3:13',
+    },
+    coverImage:
+      'https://images.unsplash.com/photo-1529070538774-1840de96b7ea?w=1200&q=80',
+    journey: [
+      {
+        key: 'understand',
+        label: 'COMPRENDRE',
+        statement: "Le pardon libère d'abord votre cœur.",
+        guidance:
+          "Retenez cette idée comme point de départ : pardonner n'approuve pas le mal, mais refuse de lui laisser la dernière parole.",
+        actionLabel: 'Je retiens',
+      },
+      {
+        key: 'read',
+        label: 'LIRE',
+        statement: 'Colossiens 3:12–14',
+        guidance:
+          'Lisez lentement ce passage et repérez ce qu\'il vous demande de revêtir dans vos relations.',
+        actionLabel: "J'ai lu",
+      },
+      {
+        key: 'pray',
+        label: 'PRIER',
+        statement: 'Confiez à Dieu ce qui pèse encore.',
+        guidance:
+          'Nommez devant Dieu la blessure, la colère ou la personne que vous avez du mal à remettre entre Ses mains.',
+        actionLabel: "J'ai prié",
+      },
+      {
+        key: 'reflect',
+        label: 'RÉFLÉCHIR',
+        statement: 'Quel poids refusez-vous encore de déposer ?',
+        guidance:
+          'Écrivez une phrase pour vous-même. Cette note reste uniquement sur cet appareil.',
+        actionLabel: 'Enregistrer ma réflexion',
+        hasNote: true,
+        notePlaceholder: "Aujourd'hui, je comprends que…",
+      },
+      {
+        key: 'act',
+        label: 'AGIR',
+        statement: "Faites aujourd'hui un pas vers la paix.",
+        guidance:
+          "Ce pas peut être une conversation, une prière, un message, ou simplement la décision de ne plus nourrir l'offense.",
+        actionLabel: "Je m'engage",
+      },
+    ],
+  },
+  {
+    title: 'Marcher par la foi',
+    titleLines: ['Marcher', 'par la foi'],
+    category: 'FOI',
+    pastor: 'Pasteure Esther',
+    duration: '28 min',
+    reference: '2 Corinthiens 5',
+    date: '6 septembre 2026',
+    summary:
+      "La foi ne supprime pas l'incertitude. Elle nous apprend à avancer avec Dieu au milieu d'elle.",
+    essentialIdea:
+      "Un petit pas d'obéissance peut ouvrir un chemin que vous ne voyez pas encore.",
+    overviewTitle: 'La foi avance avant de voir le chemin complet.',
+    overviewParagraph:
+      "Cet enseignement nous invite à déposer le besoin de tout contrôler et à faire confiance à la direction de Dieu, un pas à la fois.",
+    scripture: {
+      text: '« Car nous marchons par la foi et non par la vue. »',
+      reference: '2 Corinthiens 5:7',
+    },
+    coverImage:
+      'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=1200&q=80',
+    journey: [
+      {
+        key: 'understand',
+        label: 'COMPRENDRE',
+        statement: "La foi n'est pas l'absence de doute.",
+        guidance:
+          'Elle est la décision de faire confiance à Dieu malgré ce que vous ne comprenez pas encore.',
+        actionLabel: 'Je retiens',
+      },
+      {
+        key: 'read',
+        label: 'LIRE',
+        statement: 'Hébreux 11:1–6',
+        guidance:
+          'Lisez ce passage et notez comment la foi a conduit des personnes ordinaires à avancer.',
+        actionLabel: "J'ai lu",
+      },
+      {
+        key: 'pray',
+        label: 'PRIER',
+        statement: "Demandez le courage d'un premier pas.",
+        guidance:
+          'Présentez à Dieu ce qui vous retient et demandez-lui la foi pour avancer.',
+        actionLabel: "J'ai prié",
+      },
+      {
+        key: 'reflect',
+        label: 'RÉFLÉCHIR',
+        statement: 'Quel pas Dieu vous invite-t-il à faire ?',
+        guidance: 'Écrivez-le simplement. Une note laissée sur cet appareil.',
+        actionLabel: 'Enregistrer ma réflexion',
+        hasNote: true,
+        notePlaceholder: 'Le pas que Dieu me demande…',
+      },
+      {
+        key: 'act',
+        label: 'AGIR',
+        statement: "Faites aujourd'hui ce premier pas d'obéissance.",
+        guidance:
+          'Ce pas peut être un appel, une décision, une parole de vérité ou un engagement concret.',
+        actionLabel: "Je m'engage",
+      },
+    ],
+  },
+  {
+    title: 'Servir avec amour',
+    titleLines: ['Servir', 'avec amour'],
+    category: 'SERVICE',
+    pastor: 'Pasteur Samuel',
+    duration: '35 min',
+    reference: 'Galates 5',
+    date: '30 août 2026',
+    summary:
+      'Le service chrétien commence quand nous voyons réellement les besoins des personnes qui nous entourent.',
+    essentialIdea: 'Nous servons mieux lorsque nous commençons par écouter.',
+    overviewTitle: "On ne peut pas servir ce que l'on ne voit pas.",
+    overviewParagraph:
+      "Cet enseignement nous apprend à ralentir pour remarquer les besoins autour de nous, puis à y répondre avec un amour concret et humble.",
+    scripture: {
+      text: '« Mais que celui qui reçoit l\'instruction dans la parole fasse part de tous ses biens à celui qui l\'instruit. »',
+      reference: 'Galates 6:6',
+    },
+    coverImage:
+      'https://images.unsplash.com/photo-1469571486292-0ba58a9c6bf6?w=1200&q=80',
+    journey: [
+      {
+        key: 'understand',
+        label: 'COMPRENDRE',
+        statement: "Servir, c'est d'abord voir.",
+        guidance:
+          'Prenez le temps de remarquer les personnes et les besoins que l\'on croise sans les regarder.',
+        actionLabel: 'Je retiens',
+      },
+      {
+        key: 'read',
+        label: 'LIRE',
+        statement: 'Galates 5:13–14',
+        guidance:
+          "Lisez ce passage et cherchez comment l'amour du prochain prend une forme concrète.",
+        actionLabel: "J'ai lu",
+      },
+      {
+        key: 'pray',
+        label: 'PRIER',
+        statement: 'Demandez à Dieu de vous montrer une personne.',
+        guidance:
+          'Demandez un regard attentif et un cœur disponible pour la semaine.',
+        actionLabel: "J'ai prié",
+      },
+      {
+        key: 'reflect',
+        label: 'RÉFLÉCHIR',
+        statement: 'Qui avez-vous remarqué sans jamais agir ?',
+        guidance: 'Notez un nom ou une situation. Cette note reste sur cet appareil.',
+        actionLabel: 'Enregistrer ma réflexion',
+        hasNote: true,
+        notePlaceholder: "Aujourd'hui, je veux servir…",
+      },
+      {
+        key: 'act',
+        label: 'AGIR',
+        statement: 'Faites un geste concret cette semaine.',
+        guidance:
+          'Un appel, un service rendu, une aide discrète : un geste vaut mieux qu\'une intention.',
+        actionLabel: "Je m'engage",
+      },
+    ],
+  },
+];
+
+/**
+ * Live ChurchSiteProfile (Goma) — weeklyPrograms as published, plus derived
+ * recurringPrograms for “Aujourd’hui” / prochain rassemblement.
+ */
 const churchSiteProfileData = {
   churchName: '5ème CELPA Salem',
   tagline: 'Un lieu de paix. Une marche de foi.',
   aboutHtml:
     '<p>Nous sommes une communauté réformée qui cherche à glorifier Dieu dans la Parole, la louange et le service.</p>',
-  address: 'Kinshasa — République Démocratique du Congo',
-  serviceTimesHtml: '<p>Culte dominical : 10h00. Étude biblique : mercredi 18h30.</p>',
-  contactEmail: 'contact@celpasalem.cd',
+  address: 'Goma , République Démocratique du Congo',
+  serviceTimesHtml:
+    '<p>Deux cultes dominicaux , de 8h00 à 12h30<br>Un culte de jeunes , chaque dimanche&nbsp; à partir de 13h<br>Des cultes au courant de la semaine à partir du Mardi jusqu\'au Vendredi</p>',
+  contactEmail: 'contact@celpasalem.org',
   contactPhone: '+243 XXX XXX XXX',
   socialLinks: [
-    { label: 'Facebook', url: 'https://facebook.com' },
-    { label: 'YouTube', url: 'https://youtube.com' },
+    {
+      label: 'Facebook',
+      url: 'https://web.facebook.com/Cesam2Go/?_rdc=1&_rdr#',
+    },
+    {
+      label: 'YouTube',
+      url: 'https://www.youtube.com/@eglisecelpasalemgoma7407',
+    },
   ],
-  heroImage: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=1600&q=80',
+  heroImage:
+    'https://choir-backend.harvely.com/uploads/content/1786270791163-15124619-cb08906e-8f11-4d06-951a-405a3464fc4c.jpg',
   programsHeadline: 'Nos Programmes',
   programsIntro: 'Chaque rencontre est une étape dans votre parcours de foi',
   weeklyPrograms: [
     {
-      title: 'Culte Dominical',
+      title: 'Culte Dominical - Francophone',
       day: 'Dimanche',
-      time: '09h00 – 12h00',
+      time: '08h00 – 10h00',
       description:
-        "Un temps de louange, d'adoration et d'enseignement de la Parole. Venez tels que vous êtes, dans un esprit de paix et de communion fraternelle.",
+        "Un temps de louange, d'adoration et d'enseignement de la Parole. ",
     },
     {
-      title: 'Réunion de Prière',
+      title: 'Culte Dominical - Swahili',
+      day: 'Dimanche',
+      time: '10h00 – 12h00',
+      description:
+        "Un temps de louange, d'adoration et d'enseignement de la Parole. ",
+    },
+    {
+      title: 'Culte de jeunes',
+      day: 'Dimanche',
+      time: '13h00 – 15h00',
+      description:
+        "Un temps de louange, d'adoration et d'enseignement de la Parole. ",
+    },
+    {
+      title: '1 heure avec Jésus',
+      day: 'Lundi',
+      time: '16h00 – 17h00',
+      description:
+        "1 heure de prière et d'adoration pour nos mamans et jeunes filles",
+    },
+    {
+      title: 'Culte matinal',
+      day: 'Mardi et Jeudi',
+      time: '06h30 – 08h00',
+      description: 'Culte matinal',
+    },
+    {
+      title: 'Culte de mamans',
       day: 'Mercredi',
-      time: '18h00 – 20h00',
-      description:
-        "Un moment d'intercession et de prière communautaire. Ensemble, nous portons nos fardeaux devant le Seigneur dans la confiance et la foi.",
+      time: '06h30 – 08h00',
+      description: 'Culte de mamans',
     },
     {
-      title: 'Étude Biblique',
+      title: 'Culte de papas',
       day: 'Vendredi',
-      time: '18h00 – 19h30',
-      description:
-        'Approfondissez votre compréhension des Écritures à travers une étude structurée et interactive, guidée par nos enseignants.',
-    },
-    {
-      title: 'Rencontre des Jeunes',
-      day: 'Samedi',
-      time: '15h00 – 17h00',
-      description:
-        'Un espace dédié aux jeunes pour grandir dans la foi, partager et construire des liens fraternels solides.',
+      time: '06h30 – 08h00',
+      description: 'Culte de papas',
     },
   ],
+  recurringPrograms: [
+    {
+      id: 'rec-culte-fr',
+      title: 'Culte Dominical - Francophone',
+      subtitle: 'CELPA Salem · Goma',
+      time: '08h00',
+      meta: 'CULTE FRANCOPHONE',
+      description:
+        "Un temps de louange, d'adoration et d'enseignement de la Parole.",
+      daysOfWeek: [0],
+      isActive: true,
+      actionLabel: 'Comment participer',
+      steps: [
+        {
+          title: 'Arrivez un peu en avance',
+          description: 'Accueil dès 07h45 · CELPA Salem, Goma.',
+        },
+        {
+          title: 'Venez comme vous êtes',
+          description: 'Louange, adoration et enseignement en français.',
+        },
+      ],
+    },
+    {
+      id: 'rec-culte-sw',
+      title: 'Culte Dominical - Swahili',
+      subtitle: 'CELPA Salem · Goma',
+      time: '10h00',
+      meta: 'CULTE SWAHILI',
+      description:
+        "Un temps de louange, d'adoration et d'enseignement de la Parole.",
+      daysOfWeek: [0],
+      isActive: true,
+      actionLabel: 'Comment participer',
+      steps: [
+        {
+          title: 'Rendez-vous à 10h00',
+          description: 'CELPA Salem · Goma.',
+        },
+        {
+          title: 'Venez comme vous êtes',
+          description: 'Louange, adoration et enseignement en swahili.',
+        },
+      ],
+    },
+    {
+      id: 'rec-culte-jeunes',
+      title: 'Culte de jeunes',
+      subtitle: 'CELPA Salem · Goma',
+      time: '13h00',
+      meta: 'CULTE DE JEUNES',
+      description:
+        "Un temps de louange, d'adoration et d'enseignement de la Parole.",
+      daysOfWeek: [0],
+      isActive: true,
+      actionLabel: 'Comment participer',
+      steps: [
+        {
+          title: 'Rendez-vous à 13h00',
+          description: 'Chaque dimanche · CELPA Salem, Goma.',
+        },
+      ],
+    },
+    {
+      id: 'rec-1h-jesus',
+      title: '1 heure avec Jésus',
+      subtitle: 'Mamans et jeunes filles',
+      time: '16h00',
+      meta: '1 HEURE AVEC JÉSUS',
+      description:
+        "1 heure de prière et d'adoration pour nos mamans et jeunes filles",
+      daysOfWeek: [1],
+      isActive: true,
+      actionLabel: 'Comment participer',
+      steps: [
+        {
+          title: 'Rendez-vous lundi',
+          description: '16h00 – 17h00 · CELPA Salem, Goma.',
+        },
+      ],
+    },
+    {
+      id: 'rec-culte-matinal',
+      title: 'Culte matinal',
+      subtitle: 'CELPA Salem · Goma',
+      time: '06h30',
+      meta: 'CULTE MATINAL',
+      description: 'Culte matinal',
+      daysOfWeek: [2, 4],
+      isActive: true,
+      actionLabel: 'Comment participer',
+      steps: [
+        {
+          title: 'Mardi et jeudi',
+          description: '06h30 – 08h00 · CELPA Salem, Goma.',
+        },
+      ],
+    },
+    {
+      id: 'rec-culte-mamans',
+      title: 'Culte de mamans',
+      subtitle: 'CELPA Salem · Goma',
+      time: '06h30',
+      meta: 'CULTE DE MAMANS',
+      description: 'Culte de mamans',
+      daysOfWeek: [3],
+      isActive: true,
+      actionLabel: 'Comment participer',
+      steps: [
+        {
+          title: 'Mercredi matin',
+          description: '06h30 – 08h00 · CELPA Salem, Goma.',
+        },
+      ],
+    },
+    {
+      id: 'rec-culte-papas',
+      title: 'Culte de papas',
+      subtitle: 'CELPA Salem · Goma',
+      time: '06h30',
+      meta: 'CULTE DE PAPAS',
+      description: 'Culte de papas',
+      daysOfWeek: [5],
+      isActive: true,
+      actionLabel: 'Comment participer',
+      steps: [
+        {
+          title: 'Vendredi matin',
+          description: '06h30 – 08h00 · CELPA Salem, Goma.',
+        },
+      ],
+    },
+  ],
+  scheduleOverrides: [],
   contactHeadline: 'Contact & Cellules',
   contactIntro: 'Nous sommes là pour vous accueillir',
-  mapEmbedUrl: DEFAULT_MAP_EMBED,
+  mapEmbedUrl:
+    'https://maps.google.com/maps?width=600&height=400&hl=en&q=Eglise%205%C3%A8me%20CELPA%20Salem&t=&z=14&ie=UTF8&iwloc=B&output=embed',
   homeCellsIntro:
     'Rejoignez une cellule de maison près de chez vous pour approfondir votre vie spirituelle en petit groupe dans un cadre intime et fraternel.',
-  homeCells: ['Cellule Béthel', 'Cellule Emmaüs', 'Cellule Sion', 'Cellule Morija'],
+  homeCells: [
+    'Cellule centrale',
+    'Cellule Upendo ( Rutoboko )',
+    'Cellule Office',
+    'Cellule Majengo',
+  ],
   seoDefaults: {
     title: 'CELPA Salem — Accueil',
     description:
-      'Église réformée à Kinshasa — cultes dominicaux, études bibliques, prière et cellules de maison. Louange, Parole et communauté.',
-    ogImage: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=1200&q=80',
-    keywords: 'église Kinshasa, CELPA Salem, culte dimanche, cellule de maison, louange',
+      'Église réformée à Goma , cultes dominicaux, études bibliques, prière et cellules de maison. Louange, Parole et communauté.',
+    ogImage:
+      'https://choir-backend.harvely.com/uploads/content/1786270814748-178202930-cb08906e-8f11-4d06-951a-405a3464fc4c.jpg',
+    keywords: 'église Goma, CELPA Salem, culte dimanche, cellule de maison, louange',
   },
+  pastorQuote:
+    '« Une Église grandit lorsque la Parole devient une vie vécue. »',
+  pastorMessage:
+    'Nous voulons bâtir une communauté où chacun rencontre Christ, grandit dans Sa Parole et devient une bénédiction pour les autres.',
+  pastorName: 'CELPA Salem',
+  pastorRole: 'Pasteur principal',
+  visionTitle: 'Une Église qui vit la Parole.',
+  visionSummary:
+    'À CELPA Salem, nous voulons que chaque personne rencontre Christ, grandisse dans Sa Parole et serve les autres avec amour.',
+  visionParagraphs: [
+    "Notre vision est simple et exigeante : former une communauté où la foi n'est pas seulement proclamée, mais vécue au quotidien — dans les familles, au travail, et dans le voisinage.",
+    "Nous désirons être une Église ouverte, enracinée dans l'Écriture, attentive à la présence de Dieu et engagée pour la ville de Goma.",
+    'Grandir ensemble signifie apprendre, prier, servir et marcher les uns avec les autres — pour que la Parole devienne une vie vécue.',
+  ],
+  departmentsIntroTitle: 'Une Église, plusieurs familles.',
+  departmentsIntroSummary:
+    'Les départements de Salem sont des espaces pour servir, apprendre et trouver sa place selon ses dons.',
+  departmentsIntroParagraphs: [
+    "Que vous soyez attiré par la louange, la jeunesse, l'intercession ou l'accueil, il existe une famille ministérielle où vous pouvez grandir et contribuer.",
+    'Explorez nos départements et découvrez comment rejoindre une équipe.',
+  ],
+  responsablesTitle: 'Des serviteurs pour accompagner le corps.',
+  responsablesSummary:
+    "L'Église est conduite par des hommes et des femmes engagés à servir Christ et à veiller sur la communauté.",
+  responsablesParagraphs: [
+    'Nos responsables accompagnent la vie spirituelle, organisent les ministères et veillent à ce que chacun puisse trouver sa place à Salem.',
+  ],
+  churchLeaders: [
+    {
+      name: 'Pasteur principal',
+      roleTitle: 'Direction spirituelle',
+      imageUrl: '',
+      bio: "Il conduit l'Église dans la Parole, la prière et la vision pastorale de CELPA Salem.",
+    },
+    {
+      name: "Conseil d'anciens",
+      roleTitle: 'Gouvernance spirituelle',
+      imageUrl: '',
+      bio: "Ils veillent sur la doctrine, l'unité et le discernement pastoral de la communauté.",
+    },
+    {
+      name: 'Responsables de départements',
+      roleTitle: 'Ministères',
+      imageUrl: '',
+      bio: "Ils animent les équipes de louange, jeunesse, intercession, accueil et autres services.",
+    },
+    {
+      name: "Équipe d'accueil",
+      roleTitle: 'Première visite',
+      imageUrl: '',
+      bio: 'Elle reçoit les nouveaux venus et les accompagne dans leurs premiers pas à Salem.',
+    },
+  ],
+  historyTitle: 'Une histoire de fidélité.',
+  historySummary:
+    'CELPA Salem est née du désir de bâtir une communauté de foi ancrée dans la Parole et ouverte à la ville.',
+  historyParagraphs: [
+    "Au fil des années, Dieu a rassemblé des familles, des jeunes et des serviteurs autour d'une même conviction : l'Église est un lieu de paix, de croissance et de mission.",
+    "Des cultes aux cellules de maison, des temps de prière aux projets de construction, chaque saison a consolidé notre appel à servir Goma avec amour et perseverance.",
+    "Aujourd'hui encore, nous marchons avec reconnaissance — convaincus que l'histoire de Salem continue d'être écrite par Dieu, à travers une communauté en marche.",
+  ],
+  galleryEyebrow: 'LA VIE À SALEM',
+  galleryTitle: 'Des moments vrais, une communauté vivante.',
+  galleryItems: [
+    {
+      imageUrl:
+        'https://images.unsplash.com/photo-1438032005730-c779502df39b?w=1200&q=80',
+      alt: "Temps d'adoration à Salem",
+      caption: 'Culte',
+      large: true,
+    },
+    {
+      imageUrl:
+        'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=900&q=80',
+      alt: 'Vie de la communauté',
+      caption: 'Communauté',
+      large: false,
+    },
+    {
+      imageUrl:
+        'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=900&q=80',
+      alt: 'Projet de construction de Salem',
+      caption: 'Bâtissons Salem',
+      large: false,
+    },
+    {
+      imageUrl:
+        'https://images.unsplash.com/photo-1529070538774-1840de96b7ea?w=900&q=80',
+      alt: 'Membres réunis à Salem',
+      caption: "Vie de l'Église",
+      large: false,
+    },
+  ],
+  communityEyebrow: 'COMMUNAUTÉ',
+  communityTitle: 'Portons-nous les uns les autres.',
+  communityIntro:
+    'Des nouvelles choisies avec soin, pour prier, célébrer et agir concrètement.',
+  liveChannelUrl: 'https://www.youtube.com/@eglisecelpasalemgoma7407',
+  livePageTitle: '5Eme Celpa Live',
+  visitEyebrow: 'DÉCOUVRIR SALEM',
+  visitTitle: 'Votre première fois à Salem ?',
+  visitBody:
+    "Le culte dure environ deux heures, en français et swahili. Venez comme vous êtes — un membre de l'équipe sera là pour vous accueillir.",
+  visitCtaLabel: 'Préparer ma visite',
+  visitCtaHref: '#premiere-visite',
 };
 
 const donationSettingsData = {
@@ -598,7 +1449,80 @@ const donationSettingsData = {
   ],
   legalNoticeHtml: '<p class="text-sm opacity-80">Les dons sont utilisés conformément aux statuts de l’église.</p>',
   receiptContact: 'tresorier@celpasalem.cd',
+  spotlightEyebrow: 'BÂTISSONS SALEM',
+  spotlightTitle: '68% atteint',
+  spotlightDescription:
+    'Les murs sont debout. Ensemble, nous avançons maintenant vers la finalisation de la toiture.',
+  spotlightPhase: 'PHASE ACTUELLE · TOITURE',
+  spotlightPercent: 68,
+  spotlightImage:
+    'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=1400&q=80',
 };
+
+const communityUpdatesData = [
+  {
+    meta: 'SUJET DE PRIÈRE · ANONYME',
+    tone: 'green',
+    title: 'Une famille traverse une période de soin.',
+    description: 'Prions pour la paix, les forces et un rétablissement complet.',
+    ctaLabel: 'Je prie',
+    ctaVariant: 'outlineDark',
+    href: '#contact',
+    displayOrder: 1,
+  },
+  {
+    meta: 'BESOIN COMMUNAUTAIRE',
+    tone: 'orange',
+    title: 'Fournitures scolaires pour six enfants.',
+    description: 'Cahiers, manuels et matériel pour accompagner leur rentrée.',
+    ctaLabel: 'Je peux aider',
+    ctaVariant: 'green',
+    href: '#contact',
+    displayOrder: 2,
+  },
+];
+
+const liveEventsData = [
+  {
+    title: 'Message de #Voeux #2023 | Celpa Salem #Goma | Rev. Pst. Mulenga',
+    videoId: '2MuOi0cJi_w',
+    thumbnail: 'https://img.youtube.com/vi/2MuOi0cJi_w/mqdefault.jpg',
+    publishedAt: '2023-01-01T10:00:00Z',
+    displayOrder: 1,
+  },
+  {
+    title:
+      '(Suite) Christ mon repos | Ev. Dr. Rémy Bisaga | 2è Culte 02 10 2022',
+    videoId: 'kNvmoYZin7E',
+    thumbnail: 'https://img.youtube.com/vi/kNvmoYZin7E/mqdefault.jpg',
+    publishedAt: '2022-10-02T10:00:00Z',
+    displayOrder: 2,
+  },
+  {
+    title: "Scandales dans l'Eglise | Detty Mangaza | 2è Culte 18 09 2022",
+    videoId: 'U6U5anNaVrc',
+    thumbnail: 'https://img.youtube.com/vi/U6U5anNaVrc/mqdefault.jpg',
+    publishedAt: '2022-09-18T10:00:00Z',
+    displayOrder: 3,
+  },
+  {
+    title:
+      'Batissons Notre Avenir En Jésus Christ | Ancien ASANI RAMAZANI | Culte 2022 05 08',
+    videoId: '-10kXLHdn-0',
+    thumbnail: 'https://img.youtube.com/vi/-10kXLHdn-0/mqdefault.jpg',
+    publishedAt: '2022-05-08T10:00:00Z',
+    displayOrder: 4,
+  },
+  {
+    title:
+      'CELPA Salem Goma - Kanuni 10 za kushika katika kumtumukia Mungu - Rév. Pst. Luc Alimasi',
+    videoId: 'k0aMEX2Zp0U',
+    thumbnail: 'https://img.youtube.com/vi/k0aMEX2Zp0U/mqdefault.jpg',
+    publishedAt: '2022-01-01T10:00:00Z',
+    startSeconds: 1265,
+    displayOrder: 5,
+  },
+];
 
 export async function seedContent(dataSource: DataSource): Promise<void> {
   const typeRepo = dataSource.getRepository(ContentType);
@@ -652,6 +1576,7 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
           label: fieldDef.label,
           required: fieldDef.required,
           sortOrder: fieldDef.sortOrder,
+          showInTable: fieldDef.showInTable === true,
           validation:
             fieldDef.validation !== undefined ? fieldDef.validation : null,
         });
@@ -661,6 +1586,9 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
         f.label = fieldDef.label;
         f.required = fieldDef.required;
         f.sortOrder = fieldDef.sortOrder;
+        if (fieldDef.showInTable !== undefined) {
+          f.showInTable = fieldDef.showInTable;
+        }
         if (fieldDef.validation !== undefined) {
           f.validation = fieldDef.validation;
         }
@@ -681,22 +1609,73 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
     }
   }
 
-  async function upsertPublishedContent(
-    contentType: ContentType,
-    linkedEntityType: string,
-    linkedEntityId: number,
-    fieldValues: Record<string, unknown>,
-  ): Promise<number> {
-    let row = await contentRepo.findOne({
-      where: {
-        contentType: { id: contentType.id },
-        linkedEntityType,
-        linkedEntityId,
-      },
-      relations: ['contentType'],
-    });
+  /**
+   * When true the seed reverts to the legacy behaviour and REPLACES existing
+   * content. By default the seed is non-destructive: existing collection rows
+   * are never modified and singleton rows only receive missing keys.
+   */
+  const FORCE_SEED =
+    process.env.SEED_FORCE === '1' ||
+    process.env.SEED_FORCE === 'true' ||
+    process.env.SEED_FORCE === 'yes';
+
+  function isMissingValue(value: unknown): boolean {
+    if (value === undefined || value === null) return true;
+    if (typeof value === 'string') return value.trim() === '';
+    if (Array.isArray(value)) return value.length === 0;
+    return false;
+  }
+
+  function mergeMissingFields(
+    existing: Record<string, unknown>,
+    seed: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const merged: Record<string, unknown> = { ...existing };
+    for (const [key, value] of Object.entries(seed)) {
+      if (isMissingValue(merged[key])) {
+        merged[key] = value;
+      }
+    }
+    return merged;
+  }
+
+  type SeedContentRowOptions = {
+    contentType: ContentType;
+    linkedEntityType: string;
+    linkedEntityId: number;
+    fieldValues: Record<string, unknown>;
+    /** Natural key: when present, matching is done on `fieldValues.slug`. */
+    matchSlug?: string;
+    /** Behaviour when the row already exists (default: keep existing). */
+    onExisting?: 'skip' | 'merge';
+  };
+
+  async function seedContentRow(opts: SeedContentRowOptions): Promise<number> {
+    const { contentType, linkedEntityType, linkedEntityId, fieldValues } = opts;
+    const onExisting = opts.onExisting ?? 'skip';
+
+    let row: Content | null = null;
+    if (opts.matchSlug) {
+      row = await contentRepo
+        .createQueryBuilder('c')
+        .where('c.contentTypeId = :tid', { tid: contentType.id })
+        .andWhere('c.linkedEntityType = :lt', { lt: linkedEntityType })
+        .andWhere(`c."fieldValues"->>'slug' = :slug`, { slug: opts.matchSlug })
+        .getOne();
+    }
     if (!row) {
-      row = contentRepo.create({
+      row = await contentRepo.findOne({
+        where: {
+          contentType: { id: contentType.id },
+          linkedEntityType,
+          linkedEntityId,
+        },
+        relations: ['contentType'],
+      });
+    }
+
+    if (!row) {
+      const created = contentRepo.create({
         contentType,
         linkedEntityType,
         linkedEntityId,
@@ -705,12 +1684,20 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
         visibility: ContentVisibility.PUBLIC,
         publishedAt: new Date(),
       });
-    } else {
-      row.fieldValues = fieldValues;
-      row.status = ContentStatus.PUBLISHED;
-      row.visibility = ContentVisibility.PUBLIC;
-      row.publishedAt = row.publishedAt ?? new Date();
+      const saved = await contentRepo.save(created);
+      return saved.id;
     }
+
+    if (FORCE_SEED) {
+      row.fieldValues = fieldValues;
+    } else if (onExisting === 'merge') {
+      row.fieldValues = mergeMissingFields(row.fieldValues ?? {}, fieldValues);
+    } else {
+      return row.id;
+    }
+    row.status = ContentStatus.PUBLISHED;
+    row.visibility = ContentVisibility.PUBLIC;
+    row.publishedAt = row.publishedAt ?? new Date();
     const saved = await contentRepo.save(row);
     return saved.id;
   }
@@ -718,7 +1705,7 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
   async function ensureAlbumStub(id: number, label: string): Promise<void> {
     await dataSource.query(
       `INSERT INTO albums (id, label) VALUES ($1, $2)
-       ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label`,
+       ON CONFLICT (id) DO NOTHING`,
       [id, label],
     );
     await dataSource.query(
@@ -729,7 +1716,7 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
   async function ensurePlaylistStub(id: number, label: string): Promise<void> {
     await dataSource.query(
       `INSERT INTO playlists (id, label) VALUES ($1, $2)
-       ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label`,
+       ON CONFLICT (id) DO NOTHING`,
       [id, label],
     );
     await dataSource.query(
@@ -762,6 +1749,7 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
     allowedLinkedEntityTypes: ['SiteProfile'],
   });
   await ensureFieldDefs(churchSiteType, churchSiteProfileFieldDefinitions);
+  await removeObsoleteFieldDefs(churchSiteType, ['scheduleOverrides']);
 
   const donationType = await ensureContentType({
     name: 'Dons',
@@ -788,12 +1776,48 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
   });
   await ensureFieldDefs(playlistType, playlistFieldDefinitions);
 
+  const teachingType = await ensureContentType({
+    name: 'Enseignements',
+    code: 'Teaching',
+    description: 'Enseignement de la semaine avec parcours de foi',
+    allowedLinkedEntityTypes: ['Teaching'],
+  });
+  await ensureFieldDefs(teachingType, teachingFieldDefinitions);
+
+  const communityUpdateType = await ensureContentType({
+    name: 'Communauté',
+    code: 'CommunityUpdate',
+    description:
+      'Cartes de la section communauté (sujets de prière, entraide, nouvelles)',
+    allowedLinkedEntityTypes: ['CommunityUpdate'],
+  });
+  await ensureFieldDefs(communityUpdateType, communityUpdateFieldDefinitions);
+
+  const liveEventType = await ensureContentType({
+    name: 'Diffusions live',
+    code: 'LiveEvent',
+    description: 'Rediffusions de cultes et messages (page live)',
+    allowedLinkedEntityTypes: ['LiveEvent'],
+  });
+  await ensureFieldDefs(liveEventType, liveEventFieldDefinitions);
+
+  const programmeType = await ensureContentType({
+    name: 'Programmes',
+    code: 'Programme',
+    description:
+      'Occurrences datées des programmes (cultes, réunions) générées depuis les programmes principaux',
+    allowedLinkedEntityTypes: ['Programme'],
+  });
+  await ensureFieldDefs(programmeType, programmeFieldDefinitions);
+
   await ensureAlbumStub(1, 'Album lien #1');
-  const sampleAlbumContentId = await upsertPublishedContent(
-    albumType,
-    'Album',
-    1,
-    {
+  const sampleAlbumContentId = await seedContentRow({
+    contentType: albumType,
+    linkedEntityType: 'Album',
+    linkedEntityId: 1,
+    matchSlug: 'louange-recolte-2025',
+    onExisting: 'merge',
+    fieldValues: {
       title: 'Louange — Récolte 2025',
       slug: 'louange-recolte-2025',
       description:
@@ -801,26 +1825,65 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
       coverImage:
         'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80',
     },
-  );
+  });
 
-  console.log('✅ Upserted sample album content');
+  console.log('✅ Seeded sample album content');
 
   for (let i = 0; i < churchEventsData.length; i++) {
     const raw = churchEventsData[i] as Record<string, unknown>;
     const paragraphs = raw['bodyParagraphs'];
     const { bodyParagraphs: _removed, ...rest } = raw;
-    await upsertPublishedContent(churchEventType, 'Event', i + 1, {
-      ...rest,
-      bodyHtml: Array.isArray(paragraphs)
-        ? paragraphsToHtml(
-            paragraphs.filter((p): p is string => typeof p === 'string'),
-          )
-        : '',
+    await seedContentRow({
+      contentType: churchEventType,
+      linkedEntityType: 'Event',
+      linkedEntityId: i + 1,
+      matchSlug: typeof rest.slug === 'string' ? rest.slug : undefined,
+      fieldValues: {
+        ...rest,
+        bodyHtml: Array.isArray(paragraphs)
+          ? paragraphsToHtml(
+              paragraphs.filter((p): p is string => typeof p === 'string'),
+            )
+          : '',
+      },
     });
   }
-  console.log(`✅ Upserted ${churchEventsData.length} church events`);
+  console.log(`✅ Seeded ${churchEventsData.length} church events (preserving existing)`);
+
+  for (let i = 0; i < communityUpdatesData.length; i++) {
+    const item = communityUpdatesData[i];
+    await seedContentRow({
+      contentType: communityUpdateType,
+      linkedEntityType: 'CommunityUpdate',
+      linkedEntityId: i + 1,
+      fieldValues: item as unknown as Record<string, unknown>,
+    });
+  }
+  console.log(`✅ Seeded ${communityUpdatesData.length} community updates`);
+
+  for (let i = 0; i < liveEventsData.length; i++) {
+    const item = liveEventsData[i];
+    await seedContentRow({
+      contentType: liveEventType,
+      linkedEntityType: 'LiveEvent',
+      linkedEntityId: i + 1,
+      fieldValues: item as unknown as Record<string, unknown>,
+    });
+  }
+  console.log(`✅ Seeded ${liveEventsData.length} live events`);
 
   const songRepo = dataSource.getRepository(Song);
+
+  const existingDepartmentPageCount = await contentRepo.count({
+    where: { contentType: { id: departmentPageType.id } },
+  });
+  const shouldSeedDepartments =
+    FORCE_SEED || existingDepartmentPageCount === 0;
+  if (!shouldSeedDepartments) {
+    console.log(
+      '↷ Skipping legacy department seed (existing department pages preserved)',
+    );
+  }
 
   const rbacDeptByCode = new Map<string, number>();
 
@@ -851,17 +1914,19 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
     return id;
   }
 
-  await ensureRbacDepartment('choeur-salem', 'Chœur Salem');
-  await ensureRbacDepartment('ministere-jeunesse', 'Ministère Jeunesse');
-  await ensureRbacDepartment('intercession', 'Intercession');
-  await ensureRbacDepartment('chorale-jeunes', 'Chorale Jeunes', 'choeur-salem');
-  await ensureRbacDepartment('chorale-enfants', 'Chorale Enfants', 'choeur-salem');
-  await ensureRbacDepartment('groupe-ados', 'Groupe Ados', 'ministere-jeunesse');
-  await ensureRbacDepartment(
-    'groupe-jeunes-adultes',
-    'Jeunes Adultes',
-    'ministere-jeunesse',
-  );
+  if (shouldSeedDepartments) {
+    await ensureRbacDepartment('choeur-salem', 'Chœur Salem');
+    await ensureRbacDepartment('ministere-jeunesse', 'Ministère Jeunesse');
+    await ensureRbacDepartment('intercession', 'Intercession');
+    await ensureRbacDepartment('chorale-jeunes', 'Chorale Jeunes', 'choeur-salem');
+    await ensureRbacDepartment('chorale-enfants', 'Chorale Enfants', 'choeur-salem');
+    await ensureRbacDepartment('groupe-ados', 'Groupe Ados', 'ministere-jeunesse');
+    await ensureRbacDepartment(
+      'groupe-jeunes-adultes',
+      'Jeunes Adultes',
+      'ministere-jeunesse',
+    );
+  }
 
   const seedSongIdByLegacyKey = new Map<string, number>();
 
@@ -905,69 +1970,120 @@ export async function seedContent(dataSource: DataSource): Promise<void> {
 
   const allSeedSongIds: number[] = [];
 
-  for (let i = 0; i < departmentsData.length; i++) {
-    const raw = departmentsData[i] as Record<string, unknown>;
-    const slug = String(raw.slug ?? '');
-    const rbacDepartmentId = rbacDeptByCode.get(slug) ?? null;
-    const inlineSongs = Array.isArray(raw.songs)
-      ? (raw.songs as InlineSeedSong[])
-      : [];
-    const songIds: number[] = [];
-    for (const s of inlineSongs) {
-      const id = await upsertSeedSong(s, rbacDepartmentId);
-      songIds.push(id);
-      allSeedSongIds.push(id);
-    }
+  if (shouldSeedDepartments) {
+    for (let i = 0; i < departmentsData.length; i++) {
+      const raw = departmentsData[i] as Record<string, unknown>;
+      const slug = String(raw.slug ?? '');
+      const rbacDepartmentId = rbacDeptByCode.get(slug) ?? null;
+      const inlineSongs = Array.isArray(raw.songs)
+        ? (raw.songs as InlineSeedSong[])
+        : [];
+      const songIds: number[] = [];
+      for (const s of inlineSongs) {
+        const id = await upsertSeedSong(s, rbacDepartmentId);
+        songIds.push(id);
+        allSeedSongIds.push(id);
+      }
 
-    const { songs: _songs, subDepartmentSlugs: _subSlugs, ...rest } = raw;
-    await upsertPublishedContent(departmentPageType, 'DepartmentPage', i + 1, {
-      ...rest,
-      rbacDepartmentId,
-      songs: songIds,
-    });
+      const { songs: _songs, subDepartmentSlugs: _subSlugs, ...rest } = raw;
+      await seedContentRow({
+        contentType: departmentPageType,
+        linkedEntityType: 'DepartmentPage',
+        linkedEntityId: i + 1,
+        matchSlug: slug || undefined,
+        fieldValues: {
+          ...rest,
+          rbacDepartmentId,
+          songs: songIds,
+        },
+      });
+    }
+    console.log(
+      `✅ Seeded ${departmentsData.length} department pages with linked songs`,
+    );
   }
-  console.log(`✅ Upserted ${departmentsData.length} department pages with linked songs`);
 
   const playlistSongIds = allSeedSongIds.slice(0, 5);
   await ensurePlaylistStub(1, 'Playlist lien #1');
-  await upsertPublishedContent(playlistType, 'Playlist', 1, {
-    title: 'Dimanche — Set principal',
-    description: 'Ordre de cantiques proposé pour le culte.',
-    composers: 'Collectif Salem\nArrangements : Frère David L.',
-    participants: [
-      {
-        name: 'Sœur Esther B.',
-        roleTitle: 'Chef de chœur',
-        imageUrl: '',
-      },
-      {
-        name: 'Frère Marc L.',
-        roleTitle: 'Clavier',
-        imageUrl: '',
-      },
-    ],
-    audio_url: '',
-    video_url: '',
-    album: sampleAlbumContentId,
-    songs: playlistSongIds,
+  await seedContentRow({
+    contentType: playlistType,
+    linkedEntityType: 'Playlist',
+    linkedEntityId: 1,
+    onExisting: 'merge',
+    fieldValues: {
+      title: 'Dimanche — Set principal',
+      description: 'Ordre de cantiques proposé pour le culte.',
+      composers: 'Collectif Salem\nArrangements : Frère David L.',
+      participants: [
+        {
+          name: 'Sœur Esther B.',
+          roleTitle: 'Chef de chœur',
+          imageUrl: '',
+        },
+        {
+          name: 'Frère Marc L.',
+          roleTitle: 'Clavier',
+          imageUrl: '',
+        },
+      ],
+      audio_url: '',
+      video_url: '',
+      album: sampleAlbumContentId,
+      songs: playlistSongIds,
+    },
   });
-  console.log('✅ Upserted sample playlist with linked songs');
+  console.log('✅ Seeded sample playlist with linked songs');
 
-  await upsertPublishedContent(albumType, 'Album', 1, {
-    title: 'Louange — Récolte 2025',
-    slug: 'louange-recolte-2025',
-    description:
-      'Compilation des chants mis en avant lors des cultes de louange.',
-    coverImage:
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80',
-    songs: playlistSongIds,
+  await seedContentRow({
+    contentType: albumType,
+    linkedEntityType: 'Album',
+    linkedEntityId: 1,
+    matchSlug: 'louange-recolte-2025',
+    onExisting: 'merge',
+    fieldValues: {
+      title: 'Louange — Récolte 2025',
+      slug: 'louange-recolte-2025',
+      description:
+        'Compilation des chants mis en avant lors des cultes de louange.',
+      coverImage:
+        'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80',
+      songs: playlistSongIds,
+    },
   });
 
-  await upsertPublishedContent(churchSiteType, 'SiteProfile', 1, churchSiteProfileData);
-  console.log('✅ Upserted church site profile');
+  await seedContentRow({
+    contentType: churchSiteType,
+    linkedEntityType: 'SiteProfile',
+    linkedEntityId: 1,
+    onExisting: 'merge',
+    fieldValues: churchSiteProfileData,
+  });
+  console.log('✅ Seeded church site profile (existing values preserved)');
 
-  await upsertPublishedContent(donationType, 'DonationSettings', 1, donationSettingsData);
-  console.log('✅ Upserted donation settings');
+  await seedContentRow({
+    contentType: donationType,
+    linkedEntityType: 'DonationSettings',
+    linkedEntityId: 1,
+    onExisting: 'merge',
+    fieldValues: donationSettingsData,
+  });
+  console.log('✅ Seeded donation settings (existing values preserved)');
+
+  for (let i = 0; i < teachingsData.length; i++) {
+    const teaching = teachingsData[i];
+    const teachingSlug = slugify(teaching.title);
+    await seedContentRow({
+      contentType: teachingType,
+      linkedEntityType: 'Teaching',
+      linkedEntityId: i + 1,
+      matchSlug: teachingSlug,
+      fieldValues: {
+        ...teaching,
+        slug: teachingSlug,
+      },
+    });
+  }
+  console.log(`✅ Seeded ${teachingsData.length} teachings (preserving existing)`);
 
   console.log('🌱 Content seed completed!');
 }

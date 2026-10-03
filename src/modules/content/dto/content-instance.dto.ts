@@ -3,7 +3,9 @@ import {
   IsOptional,
   IsInt,
   IsEnum,
+  IsBoolean,
   IsObject,
+  Matches,
   MinLength,
   MaxLength,
   Min,
@@ -60,6 +62,18 @@ export class UpdateContentDto {
   @Type(() => Number)
   @IsInt()
   audienceDepartmentId?: number | null;
+}
+
+export class GenerateProgrammesDto {
+  /** Any date within the target week (normalised to its Monday). */
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  weekStart?: string;
+
+  /** Recreate missing occurrences for an already-generated week. */
+  @IsOptional()
+  @IsBoolean()
+  force?: boolean;
 }
 
 export class ListContentQueryDto {

@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ContentService } from './content.service';
 import { ContentLinkedStubService } from './content-linked-stub.service';
+import { ProgrammeGenerationService } from './programme-generation.service';
 import { CreateLinkedStubDto } from './dto/create-linked-stub.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -25,6 +26,7 @@ import {
 } from './dto/content-field.dto';
 import {
   CreateContentDto,
+  GenerateProgrammesDto,
   ListContentQueryDto,
   UpdateContentDto,
 } from './dto/content-instance.dto';
@@ -35,6 +37,7 @@ export class ContentController {
   constructor(
     private readonly contentService: ContentService,
     private readonly linkedStubService: ContentLinkedStubService,
+    private readonly programmeGeneration: ProgrammeGenerationService,
   ) {}
 
   @Get('types')
@@ -133,6 +136,16 @@ export class ContentController {
     @Body() dto: CreateContentDto,
   ) {
     return this.contentService.createContent(user, dto);
+  }
+
+  @Post('programmes/generate')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions(PERMISSION_CODES.GLOBAL_PUBLISHER)
+  generateProgrammes(@Body() dto: GenerateProgrammesDto) {
+    return this.programmeGeneration.generateWeek({
+      weekStart: dto.weekStart,
+      force: dto.force,
+    });
   }
 
   @Get('linked-options/albums')

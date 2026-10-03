@@ -23,6 +23,7 @@ import { UserRoleAssignment } from './modules/users/user-role-assignment.entity'
 import { ContentType } from './modules/content/content-type.entity';
 import { ContentFieldDefinition } from './modules/content/content-field-definition.entity';
 import { Content } from './modules/content/content.entity';
+import { ProgrammeGeneration } from './modules/content/programme-generation.entity';
 
 config();
 
@@ -67,6 +68,7 @@ export const AppDataSource = new DataSource({
     ContentType,
     ContentFieldDefinition,
     Content,
+    ProgrammeGeneration,
   ],
   migrations: ['src/database/migrations/*.ts'],
   subscribers: [],

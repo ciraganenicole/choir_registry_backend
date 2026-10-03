@@ -9,17 +9,34 @@ import { ContentLinkedStubService } from './content-linked-stub.service';
 import { ContentController } from './content.controller';
 import { PublicContentController } from './public-content.controller';
 import { PublicContentService } from './public-content.service';
+import { ProgrammeGenerationService } from './programme-generation.service';
+import { ProgrammeSchedulerService } from './programme-scheduler.service';
+import { ProgrammeGeneration } from './programme-generation.entity';
 import { UsersModule } from '../users/users.module';
 import { GuardsModule } from '../../common/guards/guards.module';
+import { CommuniqueModule } from '../communiques/communique.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ContentType, ContentFieldDefinition, Content, Song]),
+    TypeOrmModule.forFeature([
+      ContentType,
+      ContentFieldDefinition,
+      Content,
+      Song,
+      ProgrammeGeneration,
+    ]),
     UsersModule,
     GuardsModule,
+    CommuniqueModule,
   ],
-  providers: [ContentService, PublicContentService, ContentLinkedStubService],
+  providers: [
+    ContentService,
+    PublicContentService,
+    ContentLinkedStubService,
+    ProgrammeGenerationService,
+    ProgrammeSchedulerService,
+  ],
   controllers: [ContentController, PublicContentController],
-  exports: [ContentService],
+  exports: [ContentService, ProgrammeGenerationService],
 })
 export class ContentModule {}

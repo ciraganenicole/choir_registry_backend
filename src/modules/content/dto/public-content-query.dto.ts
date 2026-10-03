@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class PublicContentListQueryDto {
   @IsOptional()
@@ -14,4 +21,20 @@ export class PublicContentListQueryDto {
   @Min(1)
   @Max(50)
   limit?: number = 12;
+}
+
+export class PublicNotificationsQueryDto extends PublicContentListQueryDto {
+  @IsOptional()
+  @IsString()
+  tag?: string;
+}
+
+export class PublicProgrammeQueryDto {
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  from?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  to?: string;
 }

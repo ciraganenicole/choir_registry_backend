@@ -13,4 +13,5 @@ export const SLUG_SOURCE_FIELD_BY_TYPE_CODE: Record<string, string> = {
   ChurchEvent: 'title',
   DepartmentPage: 'name',
   Album: 'title',
-};
+  Teaching: 'title',
+}
