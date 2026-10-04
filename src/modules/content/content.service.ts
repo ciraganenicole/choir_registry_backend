@@ -13,6 +13,7 @@ import { ContentFieldType } from './enums/content-field-type.enum';
 import { ContentStatus } from './enums/content-status.enum';
 import { ContentVisibility } from './enums/content-visibility.enum';
 import { isLinkedEntityType, LinkedEntityType } from './linked-entity-type';
+import { normalizeTimeString } from './schedule.util';
 import { RbacService } from '../users/rbac.service';
 import {
   PERMISSION_CODES,
@@ -37,6 +38,8 @@ import { User } from '../users/user.entity';
 import { UsersService } from '../users/users.service';
 import { ContentJwtUser, isAdminCmsUser } from './content.types';
 import { ContentLinkedStubService } from './content-linked-stub.service';
+import { Participation } from './participation.entity';
+import { ListParticipationsQueryDto } from './dto/list-participations-query.dto';
 
 export type PaginatedContents = {
   items: Content[];
@@ -60,6 +63,9 @@ const LINKED_ENTITY_TABLE: Record<LinkedEntityType, string> = {
   Album: 'albums',
   Playlist: 'playlists',
   Teaching: '',
+  Programme: '',
+  CommunityUpdate: '',
+  LiveEvent: '',
 };
 
 @Injectable()
@@ -71,6 +77,8 @@ export class ContentService {
     private readonly fieldRepo: Repository<ContentFieldDefinition>,
     @InjectRepository(Content)
     private readonly contentRepo: Repository<Content>,
+    @InjectRepository(Participation)
+    private readonly participationRepo: Repository<Participation>,
     private readonly rbac: RbacService,
     private readonly dataSource: DataSource,
     private readonly usersService: UsersService,
@@ -298,7 +306,10 @@ export class ContentService {
       } else if (
         linkedType === 'Event' ||
         linkedType === 'DepartmentPage' ||
-        linkedType === 'Teaching'
+        linkedType === 'Teaching' ||
+        linkedType === 'Programme' ||
+        linkedType === 'CommunityUpdate' ||
+        linkedType === 'LiveEvent'
       ) {
         linkedId = await this.allocateVirtualLinkedEntityId(linkedType, false);
       } else {
@@ -335,7 +346,10 @@ export class ContentService {
       if (v === undefined || v === null || v === '') continue;
 
       this.assertValueMatchesType(def.fieldKey, def.fieldType, v, def.validation);
-      out[def.fieldKey] = v;
+      out[def.fieldKey] =
+        def.fieldType === ContentFieldType.TIME
+          ? normalizeTimeString(v as string)
+          : v;
     }
 
     if (!stripUnknown) {
@@ -372,6 +386,9 @@ export class ContentService {
         if (typeof v !== 'boolean') throw bad();
         break;
       case ContentFieldType.DATE:
+        if (typeof v !== 'string') throw bad();
+        break;
+      case ContentFieldType.TIME:
         if (typeof v !== 'string') throw bad();
         break;
       case ContentFieldType.IMAGES:
@@ -734,6 +751,24 @@ export class ContentService {
             o.large !== undefined &&
             o.large !== null &&
             typeof o.large !== 'boolean'
+          ) {
+            throw bad();
+          }
+        }
+        break;
+      }
+      case ContentFieldType.PARTICIPATION_LIST: {
+        if (!Array.isArray(v)) throw bad();
+        for (const item of v) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            throw bad();
+          }
+          const o = item as Record<string, unknown>;
+          if (typeof o.title !== 'string') throw bad();
+          if (
+            o.description !== undefined &&
+            o.description !== null &&
+            typeof o.description !== 'string'
           ) {
             throw bad();
           }
@@ -1166,6 +1201,29 @@ export class ContentService {
     row.status = ContentStatus.PUBLISHED;
     row.publishedAt = new Date();
     return this.contentRepo.save(row);
+  }
+
+  async listParticipations(
+    principal: ContentJwtUser,
+    query: ListParticipationsQueryDto,
+  ) {
+    await this.assertModuleAccess(principal);
+    const page = Math.max(1, query.page ?? 1);
+    const limit = Math.min(100, Math.max(1, query.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const qb = this.participationRepo.createQueryBuilder('p');
+    const search = query.search?.trim();
+    if (search) {
+      qb.andWhere(
+        '(p.fullName ILIKE :s OR p.contact ILIKE :s OR p.programmeTitle ILIKE :s)',
+        { s: `%${search}%` },
+      );
+    }
+    qb.orderBy('p.createdAt', 'DESC').skip(skip).take(limit);
+
+    const [items, total] = await qb.getManyAndCount();
+    return { items, total, page, limit };
   }
 
   async findAllContents(

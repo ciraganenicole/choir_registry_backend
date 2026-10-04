@@ -1,14 +1,33 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Headers,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { PublicContentService } from './public-content.service';
+import { PushService } from './push.service';
 import {
   PublicContentListQueryDto,
   PublicNotificationsQueryDto,
   PublicProgrammeQueryDto,
 } from './dto/public-content-query.dto';
+import { CreateParticipationDto } from './dto/participation.dto';
+import {
+  ProgramReminderDto,
+  PushSubscriptionDto,
+} from './dto/push.dto';
 
 @Controller('public/content')
 export class PublicContentController {
-  constructor(private readonly publicContent: PublicContentService) {}
+  constructor(
+    private readonly publicContent: PublicContentService,
+    private readonly push: PushService,
+  ) {}
 
   @Get('events')
   async listEvents(@Query() query: PublicContentListQueryDto) {
@@ -73,5 +92,42 @@ export class PublicContentController {
   @Get('programmes')
   async listProgrammes(@Query() query: PublicProgrammeQueryDto) {
     return this.publicContent.getPublicProgrammes(query);
+  }
+
+  @Post('participations')
+  @HttpCode(201)
+  async createParticipation(@Body() dto: CreateParticipationDto) {
+    return this.publicContent.createParticipation(dto);
+  }
+
+  @Get('push/public-key')
+  getPushPublicKey() {
+    return {
+      enabled: this.push.isEnabled(),
+      publicKey: this.push.getPublicKey(),
+    };
+  }
+
+  @Post('push/subscriptions')
+  @HttpCode(201)
+  savePushSubscription(
+    @Body() dto: PushSubscriptionDto,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.push.saveSubscription(dto, userAgent);
+  }
+
+  @Post('program-reminders')
+  @HttpCode(201)
+  createProgramReminder(@Body() dto: ProgramReminderDto) {
+    return this.push.createReminder(dto);
+  }
+
+  @Delete('program-reminders')
+  deleteProgramReminder(
+    @Query('clientId') clientId?: string,
+    @Query('deviceId') deviceId?: string,
+  ) {
+    return this.push.deleteReminder({ clientId, deviceId });
   }
 }

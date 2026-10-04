@@ -24,6 +24,9 @@ import { ContentType } from './modules/content/content-type.entity';
 import { ContentFieldDefinition } from './modules/content/content-field-definition.entity';
 import { Content } from './modules/content/content.entity';
 import { ProgrammeGeneration } from './modules/content/programme-generation.entity';
+import { Participation } from './modules/content/participation.entity';
+import { PushSubscription } from './modules/content/push-subscription.entity';
+import { ProgramReminder } from './modules/content/program-reminder.entity';
 
 config();
 
@@ -69,6 +72,9 @@ export const AppDataSource = new DataSource({
     ContentFieldDefinition,
     Content,
     ProgrammeGeneration,
+    Participation,
+    PushSubscription,
+    ProgramReminder,
   ],
   migrations: ['src/database/migrations/*.ts'],
   subscribers: [],

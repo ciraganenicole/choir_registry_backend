@@ -5,6 +5,8 @@ export enum ContentFieldType {
   NUMBER = 'number',
   BOOLEAN = 'boolean',
   DATE = 'date',
+  /** Time of day, stored as "HH:mm" */
+  TIME = 'time',
   IMAGE = 'image',
   IMAGES = 'images',
   RELATION = 'relation',

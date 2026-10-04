@@ -12,6 +12,8 @@ import { PublicContentService } from './public-content.service';
 import { ProgrammeGenerationService } from './programme-generation.service';
 import { ProgrammeSchedulerService } from './programme-scheduler.service';
 import { ProgrammeGeneration } from './programme-generation.entity';
+import { Participation } from './participation.entity';
+import { PushModule } from './push.module';
 import { UsersModule } from '../users/users.module';
 import { GuardsModule } from '../../common/guards/guards.module';
 import { CommuniqueModule } from '../communiques/communique.module';
@@ -24,7 +26,9 @@ import { CommuniqueModule } from '../communiques/communique.module';
       Content,
       Song,
       ProgrammeGeneration,
+      Participation,
     ]),
+    PushModule,
     UsersModule,
     GuardsModule,
     CommuniqueModule,

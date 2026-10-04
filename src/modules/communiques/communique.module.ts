@@ -6,9 +6,14 @@ import { CommuniqueController } from './communique.controller';
 import { User } from '../users/user.entity';
 import { AdminUser } from '../admin/admin_users.entity';
 import { GuardsModule } from '../../common/guards/guards.module';
+import { PushModule } from '../content/push.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Communique, User, AdminUser]), GuardsModule],
+  imports: [
+    TypeOrmModule.forFeature([Communique, User, AdminUser]),
+    GuardsModule,
+    PushModule,
+  ],
   providers: [CommuniqueService],
   controllers: [CommuniqueController],
   exports: [CommuniqueService],

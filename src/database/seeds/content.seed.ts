@@ -893,11 +893,11 @@ const programmeFieldDefinitions: FieldSeedDef[] = [
   { fieldKey: 'subtitle', fieldType: ContentFieldType.TEXT, label: 'Sous-titre', required: false, sortOrder: 2 },
   { fieldKey: 'meta', fieldType: ContentFieldType.TEXT, label: 'Catégorie / surtitre', required: false, sortOrder: 3 },
   { fieldKey: 'date', fieldType: ContentFieldType.DATE, label: 'Date', required: true, sortOrder: 4, showInTable: true },
-  { fieldKey: 'time', fieldType: ContentFieldType.TEXT, label: 'Heure de début', required: true, sortOrder: 5 },
-  { fieldKey: 'endTime', fieldType: ContentFieldType.TEXT, label: 'Heure de fin', required: false, sortOrder: 6 },
+  { fieldKey: 'time', fieldType: ContentFieldType.TIME, label: 'Heure de début', required: true, sortOrder: 5 },
+  { fieldKey: 'endTime', fieldType: ContentFieldType.TIME, label: 'Heure de fin', required: false, sortOrder: 6 },
   { fieldKey: 'location', fieldType: ContentFieldType.TEXT, label: 'Lieu', required: false, sortOrder: 7 },
   { fieldKey: 'description', fieldType: ContentFieldType.TEXTAREA, label: 'Description', required: false, sortOrder: 8 },
-  { fieldKey: 'steps', fieldType: ContentFieldType.PARTICIPATION_LIST, label: 'Comment participer', required: false, sortOrder: 9 },
+  { fieldKey: 'steps', fieldType: ContentFieldType.PARTICIPATION_LIST, label: 'Détails', required: false, sortOrder: 9 },
   { fieldKey: 'actionLabel', fieldType: ContentFieldType.TEXT, label: 'Libellé du bouton', required: false, sortOrder: 10 },
   { fieldKey: 'sourceProgramId', fieldType: ContentFieldType.TEXT, label: 'Programme source (modèle)', required: false, sortOrder: 11 },
   { fieldKey: 'isCustom', fieldType: ContentFieldType.BOOLEAN, label: 'Programme personnalisé', required: false, sortOrder: 12 },
@@ -1189,7 +1189,7 @@ const churchSiteProfileData = {
         "Un temps de louange, d'adoration et d'enseignement de la Parole.",
       daysOfWeek: [0],
       isActive: true,
-      actionLabel: 'Comment participer',
+      actionLabel: 'Détails',
       steps: [
         {
           title: 'Arrivez un peu en avance',
@@ -1211,7 +1211,7 @@ const churchSiteProfileData = {
         "Un temps de louange, d'adoration et d'enseignement de la Parole.",
       daysOfWeek: [0],
       isActive: true,
-      actionLabel: 'Comment participer',
+      actionLabel: 'Détails',
       steps: [
         {
           title: 'Rendez-vous à 10h00',
@@ -1233,7 +1233,7 @@ const churchSiteProfileData = {
         "Un temps de louange, d'adoration et d'enseignement de la Parole.",
       daysOfWeek: [0],
       isActive: true,
-      actionLabel: 'Comment participer',
+      actionLabel: 'Détails',
       steps: [
         {
           title: 'Rendez-vous à 13h00',
@@ -1251,7 +1251,7 @@ const churchSiteProfileData = {
         "1 heure de prière et d'adoration pour nos mamans et jeunes filles",
       daysOfWeek: [1],
       isActive: true,
-      actionLabel: 'Comment participer',
+      actionLabel: 'Détails',
       steps: [
         {
           title: 'Rendez-vous lundi',
@@ -1268,7 +1268,7 @@ const churchSiteProfileData = {
       description: 'Culte matinal',
       daysOfWeek: [2, 4],
       isActive: true,
-      actionLabel: 'Comment participer',
+      actionLabel: 'Détails',
       steps: [
         {
           title: 'Mardi et jeudi',
@@ -1285,7 +1285,7 @@ const churchSiteProfileData = {
       description: 'Culte de mamans',
       daysOfWeek: [3],
       isActive: true,
-      actionLabel: 'Comment participer',
+      actionLabel: 'Détails',
       steps: [
         {
           title: 'Mercredi matin',
@@ -1302,7 +1302,7 @@ const churchSiteProfileData = {
       description: 'Culte de papas',
       daysOfWeek: [5],
       isActive: true,
-      actionLabel: 'Comment participer',
+      actionLabel: 'Détails',
       steps: [
         {
           title: 'Vendredi matin',

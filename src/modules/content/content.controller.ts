@@ -13,7 +13,9 @@ import {
 import { ContentService } from './content.service';
 import { ContentLinkedStubService } from './content-linked-stub.service';
 import { ProgrammeGenerationService } from './programme-generation.service';
+import { PushService } from './push.service';
 import { CreateLinkedStubDto } from './dto/create-linked-stub.dto';
+import { ListParticipationsQueryDto } from './dto/list-participations-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
@@ -38,6 +40,7 @@ export class ContentController {
     private readonly contentService: ContentService,
     private readonly linkedStubService: ContentLinkedStubService,
     private readonly programmeGeneration: ProgrammeGenerationService,
+    private readonly pushService: PushService,
   ) {}
 
   @Get('types')
@@ -172,6 +175,15 @@ export class ContentController {
     return this.linkedStubService.createPlaylist(dto.label);
   }
 
+  @Get('participations')
+  @UseGuards(JwtAuthGuard)
+  listParticipations(
+    @CurrentUser() user: ContentJwtUser,
+    @Query() query: ListParticipationsQueryDto,
+  ) {
+    return this.contentService.listParticipations(user, query);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   findOneContent(
@@ -212,10 +224,20 @@ export class ContentController {
   @Post(':id/publish')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions(PERMISSION_CODES.GLOBAL_PUBLISHER)
-  publish(
+  async publish(
     @CurrentUser() user: ContentJwtUser,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.contentService.publish(user, id);
+    const row = await this.contentService.publish(user, id);
+    try {
+      await this.pushService.broadcastContent({
+        id: row.id,
+        linkedEntityType: row.linkedEntityType,
+        fieldValues: row.fieldValues,
+      });
+    } catch {
+      /* push must never block publishing */
+    }
+    return row;
   }
 }

@@ -23,6 +23,8 @@ import {
   type ResolvedSchedule,
 } from './schedule.util';
 import { ProgrammeGeneration } from './programme-generation.entity';
+import { Participation } from './participation.entity';
+import { CreateParticipationDto } from './dto/participation.dto';
 import { CommuniqueService } from '../communiques/communique.service';
 
 export type PaginatedResult<T> = {
@@ -61,6 +63,8 @@ export class PublicContentService {
     private readonly songRepo: Repository<Song>,
     @InjectRepository(ProgrammeGeneration)
     private readonly generationRepo: Repository<ProgrammeGeneration>,
+    @InjectRepository(Participation)
+    private readonly participationRepo: Repository<Participation>,
     private readonly communiqueService: CommuniqueService,
   ) {}
 
@@ -658,7 +662,7 @@ export class PublicContentService {
       title,
       subtitle: [p.subtitle, p.location].filter(Boolean).join(' · '),
       time: p.time,
-      action: p.actionLabel || 'Comment participer',
+      action: p.actionLabel || 'Détails',
       description: p.description,
       steps: p.steps,
       occurrenceDate: p.date,
@@ -703,7 +707,7 @@ export class PublicContentService {
           title: item.programTitle || item.title,
           lead:
             item.description ||
-            'Vous êtes les bienvenus. Voici comment participer simplement.',
+            'Vous êtes les bienvenus. Voici les détails pratiques.',
           steps:
             item.steps.length > 0
               ? item.steps
@@ -718,11 +722,6 @@ export class PublicContentService {
               label: 'Je veux venir',
               href: '#premiere-visite',
               variant: 'green',
-            },
-            {
-              label: 'Voir le programme',
-              href: '#enseignements',
-              variant: 'textLink',
             },
           ],
         },
@@ -831,6 +830,19 @@ export class PublicContentService {
       nextGathering: null,
       items: [],
     };
+  }
+
+  async createParticipation(dto: CreateParticipationDto) {
+    const row = this.participationRepo.create({
+      fullName: dto.fullName.trim(),
+      contact: dto.contact.trim(),
+      programmeId: dto.programmeId?.trim() || null,
+      programmeTitle: dto.programmeTitle?.trim() || null,
+      occurrenceDate: dto.occurrenceDate?.trim() || null,
+      note: dto.note?.trim() || null,
+    });
+    const saved = await this.participationRepo.save(row);
+    return { id: saved.id, createdAt: saved.createdAt };
   }
 
   async getDonationSettings() {

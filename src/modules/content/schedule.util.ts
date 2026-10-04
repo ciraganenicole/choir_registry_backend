@@ -134,7 +134,7 @@ export function normalizeRecurringPrograms(raw: unknown): RecurringProgram[] {
       daysOfWeek,
       isActive: o.isActive !== false,
       steps: asSteps(o.steps),
-      actionLabel: asString(o.actionLabel) || 'Comment participer',
+      actionLabel: asString(o.actionLabel) || 'Détails',
     });
   }
   return out;
@@ -161,7 +161,7 @@ export function normalizeScheduleOverrides(raw: unknown): ScheduleOverride[] {
       meta: asString(o.meta) || 'PROGRAMME',
       description: asString(o.description),
       steps: asSteps(o.steps),
-      actionLabel: asString(o.actionLabel) || 'Comment participer',
+      actionLabel: asString(o.actionLabel) || 'Détails',
     });
   }
   return out;
@@ -235,10 +235,38 @@ export function mondayOf(dateYmd: string): string {
   return addDaysYmd(dateYmd, -offset);
 }
 
+/** Normalize "09h00", "9h", "9:00" to the canonical "HH:mm" form. */
+export function normalizeTimeString(value: string): string {
+  const match = value.match(/^\s*(\d{1,2})\s*[h:]\s*(\d{2})?\s*$/i);
+  if (!match) return value.trim();
+  const hour = Number(match[1]);
+  const minute = Number(match[2] ?? 0);
+  if (hour > 23 || minute > 59) return value.trim();
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
 export function timeSortKey(time: string): number {
   const m = time.match(/(\d{1,2})\s*[h:]\s*(\d{2})?/i);
   if (!m) return 9999;
   return Number(m[1]) * 60 + Number(m[2] ?? 0);
+}
+
+/**
+ * Absolute epoch (ms) of a church-local date + time.
+ * Africa/Lubumbashi is UTC+2 year-round.
+ */
+export function churchDateTimeToEpoch(
+  dateYmd: string,
+  time: string,
+): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateYmd);
+  if (!m) return null;
+  const minutes = timeSortKey(time);
+  if (minutes >= 9999) return null;
+  return (
+    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) +
+    (minutes - 120) * 60_000
+  );
 }
 
 function capitalizeFr(label: string): string {

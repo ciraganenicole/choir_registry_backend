@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CommuniqueService } from './communique.service';
+import { PushService } from '../content/push.service';
 import { CreateCommuniqueDto, UpdateCommuniqueDto } from './dto/communique.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -21,7 +22,10 @@ import { Communique } from './communique.entity';
 
 @Controller('communiques')
 export class CommuniqueController {
-  constructor(private readonly communiqueService: CommuniqueService) {}
+  constructor(
+    private readonly communiqueService: CommuniqueService,
+    private readonly pushService: PushService,
+  ) {}
 
   // Public endpoints (no authentication required)
   @Get()
@@ -42,7 +46,28 @@ export class CommuniqueController {
     @Body() createCommuniqueDto: CreateCommuniqueDto,
     @CurrentUser() user: any,
   ): Promise<Communique> {
-    return await this.communiqueService.create(createCommuniqueDto, user.id);
+    const created = await this.communiqueService.create(
+      createCommuniqueDto,
+      user.id,
+    );
+    try {
+      const body = String(created.content ?? '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 300);
+      await this.pushService.broadcast({
+        title: created.title || 'Nouvelle annonce',
+        body,
+        url: '/',
+        tag: `communique-${created.id}`,
+      });
+    } catch {
+      /* push must never block creating an announcement */
+    }
+    return created;
   }
 
   @Patch(':id')
