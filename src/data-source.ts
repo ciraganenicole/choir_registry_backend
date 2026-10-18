@@ -1,4 +1,10 @@
-import { DevelopmentProfile, DevelopmentSector, DevelopmentSpecialty, DevelopmentSubcategory } from './modules/development/development.entity';
+import {
+  DevelopmentDirectoryAccess,
+  DevelopmentProfile,
+  DevelopmentSector,
+  DevelopmentSpecialty,
+  DevelopmentSubcategory,
+} from './modules/development/development.entity';
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
 import { AdminUser } from './modules/admin/admin_users.entity';
@@ -37,7 +43,7 @@ const getConnectionUrl = () => {
   const username = process.env.DB_USERNAME || 'postgres';
   const password = encodeURIComponent(process.env.DB_PASSWORD || 'your_password');
   const database = process.env.DB_DATABASE || 'choir_registry';
-  
+
   // Use sslmode=disable for local development
   const url = `postgresql://${username}:${password}@${host}:${port}/${database}?sslmode=disable`;
   return url;
@@ -49,16 +55,20 @@ export const AppDataSource = new DataSource({
   synchronize: false,
   logging: true,
   entities: [
-    DevelopmentProfile, DevelopmentSector, DevelopmentSpecialty, DevelopmentSubcategory,
-    User, 
-    AdminUser, 
-    Attendance, 
-    Transaction, 
-    Song, 
-    LeadershipShift, 
-    Performance, 
-    PerformanceSong, 
-    PerformanceSongMusician, 
+    DevelopmentDirectoryAccess,
+    DevelopmentProfile,
+    DevelopmentSector,
+    DevelopmentSpecialty,
+    DevelopmentSubcategory,
+    User,
+    AdminUser,
+    Attendance,
+    Transaction,
+    Song,
+    LeadershipShift,
+    Performance,
+    PerformanceSong,
+    PerformanceSongMusician,
     PerformanceVoicePart,
     Rehearsal,
     RehearsalSong,
@@ -81,6 +91,6 @@ export const AppDataSource = new DataSource({
   migrations: ['src/database/migrations/*.ts'],
   subscribers: [],
   ssl: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+  },
 });

@@ -7,7 +7,7 @@ Module autonome, sans dépendance aux comptes, rôles et professions du registre
 Ajouter les variables de [.env.development.example](../../../.env.development.example) à l’environnement du backend :
 
 - `DEVELOPMENT_JWT_SECRET` : secret dédié de 32 caractères minimum, différent de `JWT_SECRET`. Aucune valeur implicite. Sans configuration, seuls les accès à ce nouveau module sont indisponibles ; les autres modules continuent de fonctionner.
-- `DEVELOPMENT_DIRECTORY_PHONES` : numéros autorisés, séparés par des virgules. Les numéros congolais sans indicatif (`853242606`) ou avec le zéro initial (`0853242606`) sont normalisés en `+243853242606`, comme les numéros saisis à la connexion. Une liste vide ferme l’annuaire. La liste est contrôlée à chaque requête ; après modification de l’environnement, redémarrer le backend.
+- `DEVELOPMENT_DIRECTORY_PHONES` : source facultative d’import initial, séparée par des virgules. La migration `CreateDevelopmentDirectoryAccess1792300000001` reprend cette liste une seule fois dans `development_directory_access`. À la connexion, seule la base est consultée : modifier cette variable ne change plus les accès.
 - `DEVELOPMENT_CORS_ORIGINS` : origines du nouveau frontend en production, séparées par des virgules. Les origines existantes sont conservées.
 
 Depuis `choir_registry_backend` :
@@ -22,6 +22,36 @@ npm.cmd start
 La migration `CreateDevelopmentDirectory1792300000000` crée cinq tables et initialise 11 secteurs avec leurs sous-catégories et métiers. Les fiches et spécialités de cette application restent séparées du registre existant.
 
 Vérifier les migrations en attente avant de lancer la commande sur un environnement existant. La commande TypeORM du dépôt applique toutes les migrations en attente ; ne pas exécuter la migration automatiquement au démarrage de l’application.
+
+## Numéros autorisés en base
+
+La table `development_directory_access` contient `phone` (clé primaire au format international), `isActive` (booléen, vrai par défaut) et `createdAt`. Les numéros locaux sont toujours normalisés : `853242606` et `0853242606` identifient la même ligne `+243853242606`.
+
+La table est contrôlée à chaque ouverture de session et à chaque requête d’une session responsable. Supprimer une ligne ou passer `isActive` à faux révoque immédiatement cet accès, sans redémarrage. Une table vide interdit l’annuaire. L’inscription personnelle conserve son accès par numéro personnel.
+
+Pour modifier les accès dans votre outil de base de données (numéros d’exemple à remplacer) :
+
+```sql
+-- Autoriser un nouveau numéro ; conserver un éventuel accès existant.
+INSERT INTO development_directory_access (phone)
+VALUES ('+243810000000') ON CONFLICT (phone) DO NOTHING;
+
+-- Désactiver ou réactiver explicitement un numéro.
+UPDATE development_directory_access SET "isActive" = false
+WHERE phone = '+243810000000';
+UPDATE development_directory_access SET "isActive" = true
+WHERE phone = '+243810000000';
+```
+
+Pour importer explicitement une nouvelle liste depuis `DEVELOPMENT_DIRECTORY_PHONES`, après application de la migration :
+
+```powershell
+npm.cmd run development:access:import
+```
+
+L’import normalise et déduplique les numéros ; il ne supprime aucune ligne et ne réactive aucun numéro désactivé. La liste d’environnement peut être retirée après l’import. Elle n’est jamais utilisée comme solution de repli pendant une connexion.
+
+Le secret `DEVELOPMENT_JWT_SECRET` reste nécessaire pour signer les sessions. Le définir dans l’environnement **du serveur backend**, y compris en production ; une copie locale de `.env` n’est pas transmise au serveur par Git.
 
 ## API
 
@@ -79,4 +109,4 @@ $env:DEVELOPMENT_TEST_DATABASE_URL = 'postgresql://test_user:test_password@127.0
 npm.cmd test -- --runInBand development.integration.spec
 ```
 
-Sans cette variable, les tests d’intégration sont ignorés. Leur nettoyage annule la migration de ce module et supprime les photos créées pendant le test. Ne jamais fournir une base contenant des fiches à conserver.
+Sans cette variable, les tests d’intégration sont ignorés. Leur nettoyage annule les deux migrations de ce module et supprime les photos créées pendant le test. Ne jamais fournir une base contenant des fiches à conserver.

@@ -1,3 +1,5 @@
+import { Repository } from 'typeorm';
+import { DevelopmentDirectoryAccess } from './development.entity';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { DevelopmentAccess, DevelopmentGuard, normalizePhone } from './development.auth';
@@ -14,7 +16,18 @@ describe('Accès au département de développement', () => {
   };
   const jwt = new JwtService();
   const config = { get: (key: string) => values[key] } as ConfigService;
-  const access = new DevelopmentAccess(config, jwt);
+  const allowed = new Map<string, boolean>();
+  const directoryAccess = {
+    existsBy: jest.fn(
+      async ({ phone, isActive }: { phone: string; isActive: boolean }) =>
+        allowed.get(phone) === isActive,
+    ),
+  } as unknown as Repository<DevelopmentDirectoryAccess>;
+  const access = new DevelopmentAccess(config, jwt, directoryAccess);
+  beforeEach(() => {
+    allowed.clear();
+    allowed.set('+243810000000', true);
+  });
 
   it.each([
     ['853242606', '+243853242606'],
@@ -65,17 +78,25 @@ describe('Accès au département de développement', () => {
   });
   it('refuse les numéros non autorisés et les listes vides', async () => {
     await expect(access.issue('+243810000002', 'directory')).rejects.toThrow();
-    const empty = new DevelopmentAccess(
-      { get: (key: string) => (key === 'DEVELOPMENT_JWT_SECRET' ? secret : '') } as ConfigService,
-      jwt,
-    );
+    const empty = new DevelopmentAccess(config, jwt, {
+      existsBy: async () => false,
+    } as unknown as Repository<DevelopmentDirectoryAccess>);
     await expect(empty.issue('+243810000000', 'directory')).rejects.toThrow();
   });
   it('revérifie la liste des responsables après émission du jeton', async () => {
     const session = await access.issue('+243810000000', 'directory');
-    values.DEVELOPMENT_DIRECTORY_PHONES = '';
+    allowed.delete('+243810000000');
     await expect(access.verify(session.token)).rejects.toThrow();
-    values.DEVELOPMENT_DIRECTORY_PHONES = '+243810000000';
+    allowed.set('+243810000000', true);
+  });
+  it('utilise uniquement la base et respecte les accès désactivés', async () => {
+    allowed.set('+243810000000', false);
+    await expect(access.issue('0810000000', 'directory')).rejects.toThrow();
+    allowed.set('+243810000003', true);
+    const session = await access.issue('0810000003', 'directory');
+    expect(session.phone).toBe('+243810000003');
+    allowed.set('+243810000003', false);
+    await expect(access.verify(session.token)).rejects.toThrow();
   });
   it('refuse les jetons expirés et ceux du registre existant', async () => {
     const token = jwt.sign(
@@ -94,9 +115,14 @@ describe('Accès au département de développement', () => {
     const missing = new DevelopmentAccess(
       { get: () => undefined } as unknown as ConfigService,
       jwt,
+      directoryAccess,
     );
     await expect(missing.issue('+243810000000', 'personal')).rejects.toThrow();
-    const shared = new DevelopmentAccess({ get: () => secret } as unknown as ConfigService, jwt);
+    const shared = new DevelopmentAccess(
+      { get: () => secret } as unknown as ConfigService,
+      jwt,
+      directoryAccess,
+    );
     await expect(shared.issue('+243810000000', 'personal')).rejects.toThrow();
   });
   it('interdit de consulter l’annuaire avec une session personnelle et inversement', async () => {

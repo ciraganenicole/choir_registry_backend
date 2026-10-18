@@ -7,11 +7,14 @@ import request from 'supertest';
 import { DevelopmentModule } from './development.module';
 import {
   DevelopmentProfile,
+  DevelopmentDirectoryAccess,
   DevelopmentSector,
   DevelopmentSpecialty,
   DevelopmentSubcategory,
 } from './development.entity';
 import { CreateDevelopmentDirectory1792300000000 } from '../../database/migrations/1792300000000-CreateDevelopmentDirectory';
+import { CreateDevelopmentDirectoryAccess1792300000001 } from '../../database/migrations/1792300000001-CreateDevelopmentDirectoryAccess';
+import { importDevelopmentDirectoryAccess } from './development-access-import';
 import { readFile, readdir, unlink } from 'fs/promises';
 import { join } from 'path';
 
@@ -39,15 +42,26 @@ integration('Annuaire — PostgreSQL et endpoints', () => {
       url,
       entities: [
         DevelopmentProfile,
+        DevelopmentDirectoryAccess,
         DevelopmentSector,
         DevelopmentSpecialty,
         DevelopmentSubcategory,
       ],
-      migrations: [CreateDevelopmentDirectory1792300000000],
+      migrations: [
+        CreateDevelopmentDirectory1792300000000,
+        CreateDevelopmentDirectoryAccess1792300000001,
+      ],
       synchronize: false,
     });
     await db.initialize();
-    await db.runMigrations();
+    const previousImport = process.env.DEVELOPMENT_DIRECTORY_PHONES;
+    process.env.DEVELOPMENT_DIRECTORY_PHONES = '0810000000,+243810000000,810000000,+14389986297';
+    try {
+      await db.runMigrations();
+    } finally {
+      if (previousImport === undefined) delete process.env.DEVELOPMENT_DIRECTORY_PHONES;
+      else process.env.DEVELOPMENT_DIRECTORY_PHONES = previousImport;
+    }
     const module = await Test.createTestingModule({
       imports: [
         TypeOrmModule.forRootAsync({
@@ -99,8 +113,60 @@ integration('Annuaire — PostgreSQL et endpoints', () => {
         if (photo.photoUrl)
           await unlink(join(process.cwd(), photo.photoUrl.slice(1))).catch(() => undefined);
       await db.undoLastMigration();
+      await db.undoLastMigration();
       if (app) await app.close();
       if (db.isInitialized) await db.destroy();
+    }
+  });
+  it('importe les accès normalisés sans doublons dans la migration', async () => {
+    expect(await db.getRepository(DevelopmentDirectoryAccess).count()).toBe(2);
+    const login = await request(app.getHttpServer())
+      .post('/development/access')
+      .send({ phone: '0810000000', purpose: 'directory' })
+      .expect(201);
+    expect(login.body.phone).toBe('+243810000000');
+    const foreign = await request(app.getHttpServer())
+      .post('/development/access')
+      .send({ phone: '+1 (438) 998-6297', purpose: 'directory' })
+      .expect(201);
+    expect(foreign.body.phone).toBe('+14389986297');
+  });
+  it('révoque immédiatement une session après désactivation en base', async () => {
+    const repository = db.getRepository(DevelopmentDirectoryAccess);
+    await repository.update({ phone: '+243810000000' }, { isActive: false });
+    try {
+      await request(app.getHttpServer())
+        .get('/development/catalog')
+        .set(auth(directory))
+        .expect(403);
+      await request(app.getHttpServer())
+        .post('/development/access')
+        .send({ phone: '810000000', purpose: 'directory' })
+        .expect(403);
+    } finally {
+      await repository.update({ phone: '+243810000000' }, { isActive: true });
+    }
+    await request(app.getHttpServer()).get('/development/catalog').set(auth(directory)).expect(200);
+  });
+  it('importe explicitement sans réactiver les accès désactivés', async () => {
+    const repository = db.getRepository(DevelopmentDirectoryAccess);
+    await repository.update({ phone: '+243810000000' }, { isActive: false });
+    try {
+      const result = await db.transaction((manager) =>
+        importDevelopmentDirectoryAccess(manager, '0810000000,+243810000000,+243810000005'),
+      );
+      expect(result).toEqual({ total: 2, inserted: 1 });
+      expect(await repository.existsBy({ phone: '+243810000000', isActive: true })).toBe(false);
+      await expect(
+        db.transaction((manager) =>
+          importDevelopmentDirectoryAccess(manager, '+243810000006,invalide'),
+        ),
+      ).rejects.toThrow();
+      expect(await repository.existsBy({ phone: '+243810000006' })).toBe(false);
+      await expect(repository.insert({ phone: '0810000007' })).rejects.toThrow();
+      await expect(repository.insert({ phone: '+243810000005' })).rejects.toThrow();
+    } finally {
+      await repository.update({ phone: '+243810000000' }, { isActive: true });
     }
   });
   it('protège les routes avant identification et filtre les parcours', async () => {

@@ -7,9 +7,17 @@ import {
   ManyToMany,
   ManyToOne,
   PrimaryGeneratedColumn,
+  PrimaryColumn,
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
+@Entity('development_directory_access')
+export class DevelopmentDirectoryAccess {
+  @PrimaryColumn({ type: 'varchar' }) phone: string;
+  @Column({ default: true }) isActive: boolean;
+  @CreateDateColumn({ type: 'timestamptz' }) createdAt: Date;
+}
+
 @Entity('development_sectors')
 export class DevelopmentSector {
   @PrimaryGeneratedColumn() id: number;

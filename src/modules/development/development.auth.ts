@@ -5,36 +5,28 @@ import {
   Injectable,
   ServiceUnavailableException,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { DevelopmentDirectoryAccess } from './development.entity';
+import { normalizePhone } from './development-phone.util';
+export { normalizePhone } from './development-phone.util';
 export type DevelopmentPurpose = 'personal' | 'directory';
 export interface DevelopmentIdentity {
   phone: string;
   purpose: DevelopmentPurpose;
 }
 export type DevelopmentRequest = Request & { development: DevelopmentIdentity };
-export function normalizePhone(raw: string): string {
-  let phone = raw
-    .trim()
-    .replace(/[\s().-]/g, '')
-    .replace(/^00/, '+');
-  if (/^0[1-9]\d{8}$/.test(phone)) phone = '+243' + phone.slice(1);
-  else if (/^[1-9]\d{8}$/.test(phone)) phone = '+243' + phone;
-  else if (/^243[1-9]\d{8}$/.test(phone)) phone = '+' + phone;
-  if (!/^\+[1-9]\d{7,14}$/.test(phone))
-    throw new BadRequestException(
-      'Saisissez un numéro valide, par exemple 0853 242 606, 853 242 606 ou +243 853 242 606.',
-    );
-  return phone;
-}
 @Injectable()
 export class DevelopmentAccess {
   constructor(
     private readonly config: ConfigService,
     private readonly jwt: JwtService,
+    @InjectRepository(DevelopmentDirectoryAccess)
+    private readonly directoryAccess: Repository<DevelopmentDirectoryAccess>,
   ) {}
   private secret(): string {
     const value = this.config.get<string>('DEVELOPMENT_JWT_SECRET');
@@ -44,23 +36,17 @@ export class DevelopmentAccess {
       );
     return value;
   }
-  assertOrganizer(phone: string): void {
-    const allowed = (this.config.get<string>('DEVELOPMENT_DIRECTORY_PHONES') || '')
-      .split(',')
-      .filter((s) => s.trim())
-      .map((s) => {
-        try {
-          return normalizePhone(s);
-        } catch {
-          return '';
-        }
-      });
-    if (!allowed.includes(phone))
+  async assertOrganizer(phone: string): Promise<void> {
+    const allowed = await this.directoryAccess.existsBy({
+      phone: normalizePhone(phone),
+      isActive: true,
+    });
+    if (!allowed)
       throw new ForbiddenException('Ce numéro n’est pas autorisé à consulter l’annuaire.');
   }
   async issue(rawPhone: string, purpose: DevelopmentPurpose) {
     const phone = normalizePhone(rawPhone);
-    if (purpose === 'directory') this.assertOrganizer(phone);
+    if (purpose === 'directory') await this.assertOrganizer(phone);
     const token = await this.jwt.signAsync(
       { phone, purpose },
       {
@@ -98,7 +84,7 @@ export class DevelopmentAccess {
         'Votre session a expiré. Veuillez saisir à nouveau votre numéro.',
       );
     }
-    if (payload.purpose === 'directory') this.assertOrganizer(payload.phone);
+    if (payload.purpose === 'directory') await this.assertOrganizer(payload.phone);
     return { phone: payload.phone, purpose: payload.purpose };
   }
 }

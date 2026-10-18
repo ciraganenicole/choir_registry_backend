@@ -5,6 +5,7 @@ import { DevelopmentAccess, DevelopmentGuard } from './development.auth';
 import { DevelopmentController } from './development.controller';
 import {
   DevelopmentProfile,
+  DevelopmentDirectoryAccess,
   DevelopmentSector,
   DevelopmentSpecialty,
   DevelopmentSubcategory,
@@ -16,6 +17,7 @@ import { DevelopmentService } from './development.service';
     JwtModule.register({}),
     TypeOrmModule.forFeature([
       DevelopmentProfile,
+      DevelopmentDirectoryAccess,
       DevelopmentSector,
       DevelopmentSpecialty,
       DevelopmentSubcategory,
