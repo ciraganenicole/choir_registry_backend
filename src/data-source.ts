@@ -1,3 +1,4 @@
+import { DevelopmentProfile, DevelopmentSector, DevelopmentSpecialty, DevelopmentSubcategory } from './modules/development/development.entity';
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
 import { AdminUser } from './modules/admin/admin_users.entity';
@@ -48,6 +49,7 @@ export const AppDataSource = new DataSource({
   synchronize: false,
   logging: true,
   entities: [
+    DevelopmentProfile, DevelopmentSector, DevelopmentSpecialty, DevelopmentSubcategory,
     User, 
     AdminUser, 
     Attendance, 

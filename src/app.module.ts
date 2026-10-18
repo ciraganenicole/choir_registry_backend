@@ -1,3 +1,4 @@
+import { DevelopmentModule } from './modules/development/development.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -53,6 +54,7 @@ import { ContentModule } from './modules/content/content.module';
     ReportModule,
     LouadoShiftModule,
     ContentModule,
+    DevelopmentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
