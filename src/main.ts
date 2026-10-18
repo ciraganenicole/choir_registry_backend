@@ -28,7 +28,8 @@ async function bootstrap() {
       'https://5-eme-celpa-salem.vercel.app',
       'https:/celpasalem.org',
       'https://admin.celpasalem.org',
-      'https://www.celpasalem.org'
+      'https://www.celpasalem.org',
+      'https://talents.celpasalem.org',
     ],
     methods: ['GET', 'POST', 'PUT','PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: 'Content-Type, Authorization',
@@ -39,7 +40,7 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads',
   });
-  
+
 
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
