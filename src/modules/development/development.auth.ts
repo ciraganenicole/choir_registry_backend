@@ -44,7 +44,7 @@ export class DevelopmentAccess {
     if (!allowed)
       throw new ForbiddenException('Ce numéro n’est pas autorisé à consulter l’annuaire.');
   }
-  async issue(rawPhone: string, purpose: DevelopmentPurpose) {
+  async issue(rawPhone: string, purpose: DevelopmentPurpose = 'personal') {
     const phone = normalizePhone(rawPhone);
     if (purpose === 'directory') await this.assertOrganizer(phone);
     const token = await this.jwt.signAsync(
@@ -98,12 +98,7 @@ export class DevelopmentGuard implements CanActivate {
       throw new UnauthorizedException('Veuillez saisir votre numéro pour continuer.');
     request.development = await this.access.verify(header.slice(7));
     const handler = context.getHandler().name;
-    if ((handler === 'me' || handler === 'save') && request.development.purpose !== 'personal')
-      throw new ForbiddenException(
-        'Identifiez-vous avec votre numéro personnel pour modifier votre fiche.',
-      );
-    if (handler === 'people' && request.development.purpose !== 'directory')
-      throw new ForbiddenException('L’annuaire est réservé aux responsables autorisés.');
+    if (handler === 'people') await this.access.assertOrganizer(request.development.phone);
     return true;
   }
 }

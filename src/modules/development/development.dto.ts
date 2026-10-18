@@ -16,9 +16,9 @@ export class DevelopmentAccessDto {
   @IsString({ message: 'Le numéro de téléphone est obligatoire.' })
   @MaxLength(40, { message: 'Le numéro de téléphone est trop long.' })
   phone: string;
-  @IsIn(['personal', 'directory'], { message: 'Le parcours demandé est invalide.' }) purpose:
-    | 'personal'
-    | 'directory';
+  @IsOptional()
+  @IsIn(['personal', 'directory'], { message: 'Le parcours demandé est invalide.' })
+  purpose?: 'personal' | 'directory';
 }
 export class DevelopmentSpecialtyInput {
   @IsOptional() @IsInt() @Min(1) id?: number;

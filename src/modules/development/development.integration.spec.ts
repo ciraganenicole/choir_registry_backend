@@ -169,10 +169,36 @@ integration('Annuaire — PostgreSQL et endpoints', () => {
       await repository.update({ phone: '+243810000000' }, { isActive: true });
     }
   });
-  it('protège les routes avant identification et filtre les parcours', async () => {
+  it('protège les routes et partage la session avec les numéros autorisés', async () => {
     await request(app.getHttpServer()).get('/development/catalog').expect(401);
     await request(app.getHttpServer()).get('/development/people').set(auth(personal)).expect(403);
-    await request(app.getHttpServer()).get('/development/me').set(auth(directory)).expect(403);
+    await request(app.getHttpServer()).get('/development/me').set(auth(directory)).expect(200);
+    const shared = await request(app.getHttpServer())
+      .post('/development/access')
+      .send({ phone: '0810000000' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .get('/development/people')
+      .set(auth(shared.body.token))
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/development/me')
+      .set(auth(shared.body.token))
+      .expect(200);
+    const repository = db.getRepository(DevelopmentDirectoryAccess);
+    await repository.update({ phone: '+243810000000' }, { isActive: false });
+    try {
+      await request(app.getHttpServer())
+        .get('/development/people')
+        .set(auth(shared.body.token))
+        .expect(403);
+      await request(app.getHttpServer())
+        .get('/development/me')
+        .set(auth(shared.body.token))
+        .expect(200);
+    } finally {
+      await repository.update({ phone: '+243810000000' }, { isActive: true });
+    }
     await request(app.getHttpServer())
       .post('/development/access')
       .send({ phone: '+243810000099', purpose: 'directory' })

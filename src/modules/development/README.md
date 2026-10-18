@@ -27,7 +27,7 @@ Vérifier les migrations en attente avant de lancer la commande sur un environne
 
 La table `development_directory_access` contient `phone` (clé primaire au format international), `isActive` (booléen, vrai par défaut) et `createdAt`. Les numéros locaux sont toujours normalisés : `853242606` et `0853242606` identifient la même ligne `+243853242606`.
 
-La table est contrôlée à chaque ouverture de session et à chaque requête d’une session responsable. Supprimer une ligne ou passer `isActive` à faux révoque immédiatement cet accès, sans redémarrage. Une table vide interdit l’annuaire. L’inscription personnelle conserve son accès par numéro personnel.
+La même session permet de modifier sa fiche et de consulter l’annuaire. L’accès à l’annuaire vérifie la table à chaque requête : supprimer une ligne ou passer `isActive` à faux le révoque immédiatement, sans redémarrage ni déconnexion de la fiche personnelle. Une table vide interdit l’annuaire.
 
 Pour modifier les accès dans votre outil de base de données (numéros d’exemple à remplacer) :
 
@@ -59,10 +59,10 @@ Toutes les routes protégées utilisent `Authorization: Bearer <jeton>`. Les jet
 
 | Méthode | Route | Accès | Entrée et résultat |
 | --- | --- | --- | --- |
-| POST | /development/access | Sans session | JSON `{ phone, purpose: "personal" ou "directory" }` ; retourne `{ token, phone, purpose, expiresAt }` |
+| POST | /development/access | Sans session | JSON `{ phone }` ; `purpose` reste facultatif pour les anciens clients. Retourne `{ token, phone, purpose, expiresAt }` |
 | GET | /development/catalog | Les deux parcours | `{ sectors, subcategories, specialties }`, triés par nom |
-| GET | /development/me | Personnel | Fiche de son numéro ou réponse vide si elle n’existe pas |
-| PUT | /development/me | Personnel | Multipart décrit ci-dessous ; retourne la fiche enregistrée |
+| GET | /development/me | Connecté | Fiche de son numéro ou réponse vide si elle n’existe pas |
+| PUT | /development/me | Connecté | Multipart décrit ci-dessous ; retourne la fiche enregistrée |
 | GET | /development/people | Responsables | Liste paginée décrite ci-dessous |
 
 Les routes de données et d’accès renvoient `Cache-Control: no-store`.

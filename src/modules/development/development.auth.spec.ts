@@ -125,7 +125,7 @@ describe('Accès au département de développement', () => {
     );
     await expect(shared.issue('+243810000000', 'personal')).rejects.toThrow();
   });
-  it('interdit de consulter l’annuaire avec une session personnelle et inversement', async () => {
+  it('partage la session entre fiche et annuaire en vérifiant les autorisations en base', async () => {
     const guard = new DevelopmentGuard(access);
     const context = (token: string, name: string) =>
       ({
@@ -137,7 +137,13 @@ describe('Accès au département de développement', () => {
     const personal = await access.issue('+243810000001', 'personal');
     const directory = await access.issue('+243810000000', 'directory');
     await expect(guard.canActivate(context(personal.token, 'people'))).rejects.toThrow();
-    await expect(guard.canActivate(context(directory.token, 'save'))).rejects.toThrow();
+    await expect(guard.canActivate(context(directory.token, 'save'))).resolves.toBe(true);
+    const shared = await access.issue('0810000000');
+    await expect(guard.canActivate(context(shared.token, 'people'))).resolves.toBe(true);
+    await expect(guard.canActivate(context(shared.token, 'save'))).resolves.toBe(true);
+    allowed.set('+243810000000', false);
+    await expect(guard.canActivate(context(shared.token, 'people'))).rejects.toThrow();
+    await expect(guard.canActivate(context(shared.token, 'save'))).resolves.toBe(true);
     await expect(guard.canActivate(context(personal.token, 'me'))).resolves.toBe(true);
   });
   it('contrôle le type, la signature et la taille des photos', () => {
