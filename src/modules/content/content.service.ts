@@ -333,7 +333,7 @@ export class ContentService {
     const out: Record<string, unknown> = {};
 
     for (const def of definitions) {
-      const v = fieldValues[def.fieldKey];
+      let v = fieldValues[def.fieldKey];
       const missingRequired =
         def.required &&
         (v === undefined ||
@@ -344,6 +344,24 @@ export class ContentService {
         throw new BadRequestException(`Missing required field: ${def.fieldKey}`);
       }
       if (v === undefined || v === null || v === '') continue;
+
+      // Donation "methods" is a JSON list, but legacy schemas declare it as an
+      // HTML/text field. Normalise arrays to JSON so updates that send back the
+      // loaded value (e.g. changing only the spotlight image) are accepted.
+      if (def.fieldKey === 'methods') {
+        if (Array.isArray(v)) {
+          v = JSON.stringify(v);
+        } else if (typeof v === 'string' && v.trim()) {
+          try {
+            const parsed: unknown = JSON.parse(v);
+            if (!Array.isArray(parsed)) throw new Error('not an array');
+          } catch {
+            throw new BadRequestException(
+              'Field "methods" must be a JSON array',
+            );
+          }
+        }
+      }
 
       this.assertValueMatchesType(def.fieldKey, def.fieldType, v, def.validation);
       out[def.fieldKey] =

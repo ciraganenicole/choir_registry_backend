@@ -860,6 +860,18 @@ export class PublicContentService {
       throw new NotFoundException('Donation settings not found');
     }
     const fv = row.fieldValues ?? {};
+    const methodsRaw = fv['methods'];
+    let methods: unknown[] = [];
+    if (Array.isArray(methodsRaw)) {
+      methods = methodsRaw;
+    } else if (typeof methodsRaw === 'string' && methodsRaw.trim()) {
+      try {
+        const parsed: unknown = JSON.parse(methodsRaw);
+        if (Array.isArray(parsed)) methods = parsed;
+      } catch {
+        methods = [];
+      }
+    }
     const percentRaw = fv['spotlightPercent'];
     const spotlightPercent =
       typeof percentRaw === 'number'
@@ -870,7 +882,7 @@ export class PublicContentService {
     return {
       headline: fv['headline'],
       bodyHtml: fv['bodyHtml'],
-      methods: fv['methods'] ?? [],
+      methods,
       legalNoticeHtml: fv['legalNoticeHtml'],
       receiptContact: fv['receiptContact'],
       spotlightEyebrow:

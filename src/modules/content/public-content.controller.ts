@@ -8,9 +8,11 @@ import {
   Param,
   Post,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
 import { PublicContentService } from './public-content.service';
 import { PushService } from './push.service';
+import { NoStoreInterceptor } from './no-store.interceptor';
 import {
   PublicContentListQueryDto,
   PublicNotificationsQueryDto,
@@ -23,6 +25,7 @@ import {
 } from './dto/push.dto';
 
 @Controller('public/content')
+@UseInterceptors(NoStoreInterceptor)
 export class PublicContentController {
   constructor(
     private readonly publicContent: PublicContentService,
